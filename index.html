@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>EverQuest Spell Research Assistant</title><link rel="stylesheet" href="styles.css"></head><body>
-<header><div><div class="eyebrow">EVERQUEST RESEARCH TOOL</div><h1>Spell Research Assistant</h1><p>Load your inventory, choose a class, see what you can make, and plan Research skill-ups.</p></div><div class="version">v0.14.1-demo.3</div></header>
+<header><div><div class="eyebrow">EVERQUEST RESEARCH TOOL</div><h1>Spell Research Assistant</h1><p>Load your inventory, choose a class, see what you can make, and plan Research skill-ups.</p></div><div class="version">v0.14.1-demo.5</div></header>
 <section class="quick-lookup-bar"><div class="quick-inner">
 <div><strong>Quick Loot Lookup</strong><small>What did you just find?</small></div>
 <input id="quickLootSearch" placeholder="Type item name or item ID…"><button id="quickLootButton">Find Research Uses</button>
@@ -18,7 +18,14 @@
   <button id="installVerifiedUpdate" class="danger" disabled>Install Verified Update</button>
   <a id="openReleasePage" class="button-link ghost hidden" href="#" target="_blank" rel="noopener">Open Release Page ↗</a>
  </div>
- <div id="updateStatus" class="status muted">Current demo: v0.14.1-demo.3 • stable baseline: v0.14.0</div>
+ <div id="updateVersionGrid" class="update-version-grid">
+   <div><span>Demo build</span><strong>v0.14.1-demo.5</strong></div>
+   <div><span>Stable baseline</span><strong>v0.14.0</strong></div>
+   <div><span>Latest stable</span><strong id="latestStableVersion">Not checked</strong></div>
+ </div>
+ <div id="updateStatus" class="status muted">Updater demo ready. Check GitHub to compare this demo against the stable channel.</div>
+ <div id="previousUpdateResult" class="update-result-card hidden"></div>
+ <div id="backupSummary" class="update-backup-summary hidden"></div>
  <div id="updateProgress" class="update-progress hidden"><div id="updateProgressBar"></div></div>
  <div id="updateReleaseNotes" class="update-release-notes hidden"></div>
 </section>

@@ -33,7 +33,7 @@ function Strip-Html([string]$html) {
     return ([regex]::Replace($x,'\s+',' ')).Trim()
 }
 function Invoke-Bastion([string]$url) {
-    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Spell-Research-Assistant/0.14.1-demo.2"}).Content
+    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Spell-Research-Assistant/0.14.1-demo.4"}).Content
 }
 function Parse-RecipePage([int]$id,[string]$html) {
     $plain=Strip-Html $html
@@ -396,7 +396,7 @@ function Get-AppVersionInfo {
     if(Test-Path -LiteralPath $versionPath){
         try{return (Get-Content -LiteralPath $versionPath -Raw | ConvertFrom-Json)}catch{}
     }
-    return [pscustomobject]@{version="0.14.1-demo.2";channel="demo";stableBaseVersion="0.14.0"}
+    return [pscustomobject]@{version="0.14.1-demo.4";channel="demo";stableBaseVersion="0.14.0"}
 }
 function Convert-VersionCore([string]$version){
     $clean=($version -replace '^v','').Split('-')[0]
@@ -405,7 +405,7 @@ function Convert-VersionCore([string]$version){
     return [version]("{0}.{1}.{2}" -f $parts[0],$parts[1],$parts[2])
 }
 function Get-LatestGitHubRelease {
-    $headers=@{"User-Agent"="EQ-Spell-Research-Assistant/0.14.1-demo.2";"Accept"="application/vnd.github+json"}
+    $headers=@{"User-Agent"="EQ-Spell-Research-Assistant/0.14.1-demo.4";"Accept"="application/vnd.github+json"}
     return Invoke-RestMethod -UseBasicParsing -Uri $updateApi -TimeoutSec 45 -Headers $headers
 }
 function Get-UpdateInfo {
@@ -445,7 +445,7 @@ function Download-AndVerifyLatestUpdate {
     $dest=Join-Path $updateStage $info.assetName
     $tmp=$dest+".download"
     if(Test-Path -LiteralPath $tmp){Remove-Item -LiteralPath $tmp -Force}
-    $headers=@{"User-Agent"="EQ-Spell-Research-Assistant/0.14.1-demo.2"}
+    $headers=@{"User-Agent"="EQ-Spell-Research-Assistant/0.14.1-demo.4"}
     try{
         Invoke-WebRequest -UseBasicParsing -Uri $info.assetUrl -OutFile $tmp -TimeoutSec 120 -Headers $headers
         $actual=(Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -461,6 +461,23 @@ function Download-AndVerifyLatestUpdate {
     }
 }
 
+
+function Get-UpdateState {
+    $result=$null
+    $resultPath=Join-Path $root "update-result.json"
+    if(Test-Path -LiteralPath $resultPath){try{$result=Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json}catch{}}
+    $parent=Split-Path -Parent $root
+    $leaf=Split-Path -Leaf $root
+    $backups=@()
+    try{
+        $backups=@(Get-ChildItem -LiteralPath $parent -Directory -ErrorAction SilentlyContinue |
+            Where-Object {$_.Name -like ($leaf + "_backup_*")} |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 10 |
+            ForEach-Object {[pscustomobject]@{path=$_.FullName;name=$_.Name;lastWriteTime=$_.LastWriteTime.ToString("o")}})
+    }catch{}
+    return [pscustomobject]@{ok=$true;result=$result;backups=$backups}
+}
 
 function Start-SafeVerifiedUpdate {
     $info=Get-UpdateInfo
@@ -535,6 +552,21 @@ try {
     } | ConvertTo-Json -Depth 4
     $result | Set-Content -LiteralPath (Join-Path $Root "update-result.json") -Encoding UTF8
 
+    # Keep only the two newest sibling backups for this installation path.
+    try {
+        $rootParent=Split-Path -Parent $Root
+        $rootLeaf=Split-Path -Leaf $Root
+        $matching=@(Get-ChildItem -LiteralPath $rootParent -Directory -ErrorAction SilentlyContinue |
+            Where-Object {$_.Name -like ($rootLeaf + "_backup_*")} |
+            Sort-Object LastWriteTime -Descending)
+        if($matching.Count -gt 2){
+            @($matching | Select-Object -Skip 2) | ForEach-Object {
+                Write-UpdaterLog ("Removing old backup by retention policy: " + $_.FullName)
+                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    } catch { Write-UpdaterLog ("Backup retention warning: " + $_.Exception.Message) }
+
     $bat=Join-Path $Root "START-LIVE-MONITOR.bat"
     $restartCommand='start "" "{0}"' -f $bat
     Write-UpdaterLog "Install completed. Restarting application."
@@ -580,7 +612,7 @@ try {
 
 $shutdownForUpdate=$false
 $listener=New-Object Net.HttpListener;$prefix="http://127.0.0.1:$port/";$listener.Prefixes.Add($prefix);$listener.Start()
-Write-Host "";Write-Host "EverQuest Spell Research Assistant v0.14.1-demo.3";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
+Write-Host "";Write-Host "EverQuest Spell Research Assistant v0.14.1-demo.4";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
 Start-Process ($prefix + "index.html")
 
 try{
@@ -597,6 +629,11 @@ while($listener.IsListening){
         $path=$req.Url.AbsolutePath
 
 
+        if($path -eq "/api/update-state"){
+            try{$payload=(Get-UpdateState | ConvertTo-Json -Depth 8)}
+            catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
+            $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
+        }
         if($path -eq "/api/update-check"){
             try{$payload=(Get-UpdateInfo | ConvertTo-Json -Depth 8)}
             catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}

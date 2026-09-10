@@ -1,6 +1,17 @@
+## v0.14.1-demo.5
+- Fixes demo updater status detection so demo builds newer than the latest stable release display `DEMO AHEAD` instead of `UP TO DATE`.
+- No self-install, backup, rollback, download, or restart mechanics changed.
+
+## v0.14.1-demo.4
+- Adds startup reporting for the previous updater result (`update-result.json`).
+- Separates Demo Build, Stable Baseline, and Latest Stable version status.
+- Discovers timestamped rollback backups for the current install path.
+- Adds post-success backup retention: keep the two newest matching backups.
+- Keeps the tested demo.3 replacement/rollback engine unchanged otherwise.
+
 # Changelog
 
-## v0.14.1-demo.3
+## v0.14.1-demo.4
 - Added guarded self-install/restart path for already verified GitHub release assets.
 - Entire current application folder is backed up before replacement.
 - Preserves monitor-config.json and writes update-result.json.

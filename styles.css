@@ -95,3 +95,15 @@ button.danger{border-color:#8f463c;background:#3a1715;color:#ffd9d3}
 button.danger:not(:disabled):hover{background:#54201c;border-color:#c45e50}
 .update-warning{margin-top:10px;padding:10px 12px;border:1px solid #735b25;background:#2c2410;border-radius:8px;color:#f0d58a}
 .update-success{color:#7fe0a5}
+
+
+/* v0.14.1-demo.4 updater reporting */
+.update-version-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
+.update-version-grid>div,.update-result-card,.update-backup-summary{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:rgba(255,255,255,.025)}
+.update-version-grid span,.update-version-grid strong,.update-result-card span,.update-result-card small,.update-backup-summary span,.update-backup-summary small{display:block}
+.update-version-grid span{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.update-version-grid strong{margin-top:3px}
+.update-result-card,.update-backup-summary{margin-top:10px}
+.update-result-card span,.update-backup-summary span{margin-top:4px}
+.update-result-card small,.update-backup-summary small{margin-top:6px;color:var(--muted);word-break:break-all}
+@media(max-width:760px){.update-version-grid{grid-template-columns:1fr}}

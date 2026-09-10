@@ -1,6 +1,9 @@
 # Demo Branch
 
-## v0.14.1-demo.3
+## v0.14.1-demo.4
+- startup updater-result reporting
+- explicit demo/stable/latest version separation
+- backup discovery and two-backup retention
 
 Based directly on production v0.14.0.
 

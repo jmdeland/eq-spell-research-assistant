@@ -849,16 +849,16 @@ async function checkForUpdates(){
   if(!liveMonitorOnline)throw Error("Start START-LIVE-MONITOR.bat first. Update checks run through the local companion.");
   const r=await fetch(apiUrl("/api/update-check"),{cache:"no-store"}),j=await r.json();
   if(!r.ok||!j.ok)throw Error(j.error||`HTTP ${r.status}`);
-  latestUpdateInfo=j;const cmp=compareStableVersions(j.latestVersion,j.installedStableVersion);
+  latestUpdateInfo=j;const cmp=compareStableVersions(j.latestVersion,j.installedStableVersion);const latestEl=$("#latestStableVersion");if(latestEl)latestEl.textContent=j.latestTag;
   if(link&&j.releaseUrl){link.href=j.releaseUrl;link.classList.remove("hidden")}
   renderReleaseNotes(j);
   if(j.updateAvailable){
    updateBadge("UPDATE AVAILABLE","online");
    setUpdateStatus(`<strong>${esc(j.latestTag)}</strong> is available. Installed stable baseline: ${esc(j.installedStableVersion)}. Asset: ${esc(j.assetName)}.`);
    if(dl){dl.disabled=false;dl.textContent=`Download & Verify ${j.latestTag}`}
-  }else if(j.channel==="demo"&&cmp<0){
+  }else if(j.channel==="demo"&&compareStableVersions(j.installedVersion,j.latestVersion)>0){
    updateBadge("DEMO AHEAD","online");
-   setUpdateStatus(`This demo (${esc(j.installedVersion)}) is ahead of the latest stable release (${esc(j.latestTag)}). Use the test download to verify the updater pipeline without installing anything.`);
+   setUpdateStatus(`<strong>Demo build:</strong> ${esc(j.installedVersion)} • <strong>Stable baseline:</strong> v${esc(j.installedStableVersion)} • <strong>Latest stable:</strong> ${esc(j.latestTag)}.<br><span class="muted">This experimental demo build is newer than the current production release. Its stable baseline matches ${esc(j.latestTag)}; test download/install remains available for updater validation.</span>`);
    if(dl){dl.disabled=false;dl.textContent=`Test Verified Download ${j.latestTag}`}
   }else{
    updateBadge("UP TO DATE","online");
@@ -909,6 +909,26 @@ async function installVerifiedUpdate(){
   if(install){install.disabled=false;install.textContent=`Install Verified ${tag}`}
  }
 }
+async function loadUpdaterState(){
+ const resultBox=$("#previousUpdateResult"),backupBox=$("#backupSummary");
+ try{
+  if(!liveMonitorOnline)return;
+  const r=await fetch(apiUrl("/api/update-state"),{cache:"no-store"}),j=await r.json();
+  if(!r.ok||!j.ok)return;
+  if(j.result&&resultBox){
+   const x=j.result,ok=x.ok===true;
+   const when=x.installedAt||x.failedAt||"unknown time";
+   resultBox.innerHTML=ok
+    ? `<strong>Last update succeeded</strong><span>${esc(x.installedTag||"Update")} installed ${esc(when)}</span>${x.backupPath?`<small>Backup: ${esc(x.backupPath)}</small>`:""}`
+    : `<strong>Last update failed</strong><span>${esc(x.error||"Unknown error")} • ${esc(when)}</span>`;
+   resultBox.classList.remove("hidden");
+  }
+  if(backupBox&&Array.isArray(j.backups)&&j.backups.length){
+   backupBox.innerHTML=`<strong>Available rollback backups</strong><span>${j.backups.length} found; updater retains the two newest backups for this install path.</span><small>${j.backups.map(b=>esc(b.path)).join("<br>")}</small>`;
+   backupBox.classList.remove("hidden");
+  }
+ }catch{}
+}
 function setupUpdaterUI(){
  $("#checkForUpdates")?.addEventListener("click",checkForUpdates);
  $("#downloadLatestUpdate")?.addEventListener("click",downloadLatestUpdate);
@@ -917,5 +937,6 @@ function setupUpdaterUI(){
 
 setupUpdaterUI();
 setupLiveUI();
+setTimeout(loadUpdaterState,1200);
 setTimeout(restoreMagelo,700);
 render();
