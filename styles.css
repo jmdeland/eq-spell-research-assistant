@@ -78,3 +78,20 @@
 .owned-note{display:block;font-size:10px;color:#7bdba8;margin-top:2px}
 .magelo-reconcile{margin-top:6px;color:#7bdba8;font-size:12px}
 #lootOwnershipMode{min-width:290px}
+
+
+/* v0.14.1-demo.1 updater test UI */
+.update-panel{border-color:#31516b;background:linear-gradient(180deg,#101a23,#0e171f)}
+.update-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px;align-items:center}
+.button-link{display:inline-flex;align-items:center;justify-content:center;padding:9px 12px;border:1px solid var(--line);border-radius:7px;text-decoration:none;color:inherit;font-size:12px}
+.button-link:hover{border-color:#53728e}.hidden{display:none!important}
+.update-release-notes{margin-top:13px;border:1px solid var(--line);border-radius:9px;background:#0d151d;padding:12px 14px}
+.update-release-notes h3{margin:0 0 8px;font-size:14px}.update-release-notes pre{margin:0;white-space:pre-wrap;font:inherit;font-size:12px;line-height:1.5;color:var(--muted)}
+.update-progress{height:7px;background:#0a1117;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:12px}
+#updateProgressBar{height:100%;width:0;background:linear-gradient(90deg,#315b79,#66b4db);transition:width .25s ease}
+.update-error{color:#eaa0a0}
+\n/* v0.14.1-demo.2 safe updater */
+button.danger{border-color:#8f463c;background:#3a1715;color:#ffd9d3}
+button.danger:not(:disabled):hover{background:#54201c;border-color:#c45e50}
+.update-warning{margin-top:10px;padding:10px 12px;border:1px solid #735b25;background:#2c2410;border-radius:8px;color:#f0d58a}
+.update-success{color:#7fe0a5}

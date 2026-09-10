@@ -814,6 +814,108 @@ $("#inventoryFiles")?.addEventListener("change",e=>{if(e.target.files&&e.target.
 
 $("#mageloCharacter")?.addEventListener("keydown",e=>{if(e.key==="Enter")loadMagelo()});
 $("#clearMagelo")?.addEventListener("click",clearMagelo);
+
+const UPDATE_API="https://api.github.com/repos/jmdeland/eq-spell-research-assistant/releases/latest";
+let latestUpdateInfo=null;
+let verifiedUpdateInfo=null;
+function parseVersionParts(v){
+ const clean=String(v||"").replace(/^v/i,"").split("-")[0];
+ return clean.split(".").map(x=>Number(x)||0).slice(0,3).concat([0,0,0]).slice(0,3);
+}
+function compareStableVersions(a,b){
+ const aa=parseVersionParts(a),bb=parseVersionParts(b);
+ for(let i=0;i<3;i++){if(aa[i]!==bb[i])return aa[i]>bb[i]?1:-1}
+ return 0;
+}
+function updateBadge(text,kind){
+ const el=$("#updateStatusBadge");if(!el)return;
+ el.textContent=text;el.className=`live-status ${kind||"offline"}`;
+}
+function setUpdateStatus(html){const el=$("#updateStatus");if(el)el.innerHTML=html}
+function renderReleaseNotes(info){
+ const box=$("#updateReleaseNotes");if(!box)return;
+ const body=String(info?.body||"").trim();
+ if(!body){box.classList.add("hidden");box.innerHTML="";return}
+ box.innerHTML=`<h3>${esc(info.name||info.tagName||"Release notes")}</h3><pre>${esc(body)}</pre>`;
+ box.classList.remove("hidden");
+}
+async function checkForUpdates(){
+ const btn=$("#checkForUpdates"),dl=$("#downloadLatestUpdate"),install=$("#installVerifiedUpdate"),link=$("#openReleasePage");
+ verifiedUpdateInfo=null;if(install)install.disabled=true;
+ if(btn){btn.disabled=true;btn.textContent="Checking…"}
+ if(dl)dl.disabled=true;
+ updateBadge("CHECKING","offline");setUpdateStatus("Contacting GitHub stable releases…");
+ try{
+  if(!liveMonitorOnline)throw Error("Start START-LIVE-MONITOR.bat first. Update checks run through the local companion.");
+  const r=await fetch(apiUrl("/api/update-check"),{cache:"no-store"}),j=await r.json();
+  if(!r.ok||!j.ok)throw Error(j.error||`HTTP ${r.status}`);
+  latestUpdateInfo=j;const cmp=compareStableVersions(j.latestVersion,j.installedStableVersion);
+  if(link&&j.releaseUrl){link.href=j.releaseUrl;link.classList.remove("hidden")}
+  renderReleaseNotes(j);
+  if(j.updateAvailable){
+   updateBadge("UPDATE AVAILABLE","online");
+   setUpdateStatus(`<strong>${esc(j.latestTag)}</strong> is available. Installed stable baseline: ${esc(j.installedStableVersion)}. Asset: ${esc(j.assetName)}.`);
+   if(dl){dl.disabled=false;dl.textContent=`Download & Verify ${j.latestTag}`}
+  }else if(j.channel==="demo"&&cmp<0){
+   updateBadge("DEMO AHEAD","online");
+   setUpdateStatus(`This demo (${esc(j.installedVersion)}) is ahead of the latest stable release (${esc(j.latestTag)}). Use the test download to verify the updater pipeline without installing anything.`);
+   if(dl){dl.disabled=false;dl.textContent=`Test Verified Download ${j.latestTag}`}
+  }else{
+   updateBadge("UP TO DATE","online");
+   setUpdateStatus(`You are up to date on the stable channel (${esc(j.latestTag)}). You can still test downloading and verifying the current release asset.`);
+   if(dl){dl.disabled=false;dl.textContent=`Test Verified Download ${j.latestTag}`}
+  }
+ }catch(e){latestUpdateInfo=null;updateBadge("CHECK FAILED","offline");setUpdateStatus(`<span class="update-error">Update check failed: ${esc(e.message)}</span>`)}
+ finally{if(btn){btn.disabled=false;btn.textContent="Check for Updates"}}
+}
+async function downloadLatestUpdate(){
+ const dl=$("#downloadLatestUpdate"),barWrap=$("#updateProgress"),bar=$("#updateProgressBar");
+ if(dl){dl.disabled=true;dl.textContent="Downloading…"}
+ if(barWrap)barWrap.classList.remove("hidden");if(bar)bar.style.width="35%";
+ setUpdateStatus(`Downloading ${esc(latestUpdateInfo?.assetName||"latest stable release")} to the local update staging folder…`);
+ try{
+  if(!liveMonitorOnline)throw Error("Local companion is offline.");
+  const r=await fetch(apiUrl("/api/update-download"),{cache:"no-store"}),j=await r.json();
+  if(bar)bar.style.width="85%";
+  if(!r.ok||!j.ok)throw Error(j.error||`HTTP ${r.status}`);
+  if(bar)bar.style.width="100%";
+  verifiedUpdateInfo=j;
+  const install=$("#installVerifiedUpdate");if(install){install.disabled=false;install.textContent=`Install Verified ${j.latestTag||latestUpdateInfo?.latestTag||"Update"}`}
+  updateBadge("VERIFIED","online");
+  setUpdateStatus(`<strong>Verified download complete.</strong> ${esc(j.fileName)} • ${esc(j.sizeText)}<br><span class="muted">SHA-256: ${esc(j.sha256)}</span><br><span class="muted">Staged at: ${esc(j.path)}</span><div class="update-warning"><strong>Safe-install test:</strong> installing will close this demo, rename the entire current folder to a timestamped backup, install ${esc(j.latestTag||latestUpdateInfo?.latestTag||"the verified release")} into this folder path, preserve monitor-config.json, and restart the app.</div>`);
+ }catch(e){updateBadge("DOWNLOAD FAILED","offline");setUpdateStatus(`<span class="update-error">Verified download failed: ${esc(e.message)}</span>`);if(bar)bar.style.width="0%"}
+ finally{setTimeout(()=>barWrap?.classList.add("hidden"),1200);if(dl){dl.disabled=false;dl.textContent=latestUpdateInfo?`Test Verified Download ${latestUpdateInfo.latestTag}`:"Test Verified Download"}}
+}
+async function installVerifiedUpdate(){
+ const install=$("#installVerifiedUpdate");
+ if(!verifiedUpdateInfo){setUpdateStatus('<span class="update-error">Download and verify the release first.</span>');return}
+ const tag=verifiedUpdateInfo.latestTag||latestUpdateInfo?.latestTag||"the verified release";
+ const isDemo=String(latestUpdateInfo?.channel||"").toLowerCase()==="demo";
+ const warning=isDemo
+   ? `TEST INSTALL: This will replace this demo folder with stable ${tag}. The complete current demo folder will be renamed as a timestamped backup beside it. Continue?`
+   : `Install ${tag}? The complete current application folder will be backed up before replacement. Continue?`;
+ if(!confirm(warning))return;
+ if(install){install.disabled=true;install.textContent="Preparing safe install…"}
+ updateBadge("INSTALLING","offline");
+ setUpdateStatus(`Preparing safe install of <strong>${esc(tag)}</strong>… The companion will close, the current folder will be backed up, and the application should restart automatically.`);
+ try{
+  const r=await fetch(apiUrl("/api/update-install"),{cache:"no-store"}),j=await r.json();
+  if(!r.ok||!j.ok)throw Error(j.error||`HTTP ${r.status}`);
+  setUpdateStatus(`<strong>Updater launched.</strong> ${esc(j.latestTag||tag)}<br><span class="muted">Backup will be created at: ${esc(j.backupPath)}</span><br><span class="muted">This page will disconnect while files are replaced. The application should reopen automatically.</span>`);
+  updateBadge("RESTARTING","offline");
+ }catch(e){
+  updateBadge("INSTALL FAILED","offline");
+  setUpdateStatus(`<span class="update-error">Safe install could not start: ${esc(e.message)}</span>`);
+  if(install){install.disabled=false;install.textContent=`Install Verified ${tag}`}
+ }
+}
+function setupUpdaterUI(){
+ $("#checkForUpdates")?.addEventListener("click",checkForUpdates);
+ $("#downloadLatestUpdate")?.addEventListener("click",downloadLatestUpdate);
+ $("#installVerifiedUpdate")?.addEventListener("click",installVerifiedUpdate);
+}
+
+setupUpdaterUI();
 setupLiveUI();
 setTimeout(restoreMagelo,700);
 render();

@@ -39,3 +39,8 @@ This source tree is sanitized for publication. See `docs/RELEASE_PROCESS.md` and
 
 - Stable production: **v0.14.0**
 - Experimental visual/features: keep in a separate demo branch/package and promote selectively after testing.
+
+
+## Demo build note
+
+This package is **v0.14.1-demo.1** for testing the GitHub update-check and verified-download pipeline. It does not install updates or overwrite production files.
