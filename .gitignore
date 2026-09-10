@@ -1,0 +1,9 @@
+monitor-config.local.json
+magelo-debug.html
+data/bastion-spell-metadata-status.json
+data/bastion-spell-metadata-stdout.txt
+data/bastion-spell-metadata-stderr.txt
+*.log
+*.dmp
+.DS_Store
+Thumbs.db
