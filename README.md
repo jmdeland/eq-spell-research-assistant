@@ -38,4 +38,4 @@ This source tree is sanitized for publication. See `docs/RELEASE_PROCESS.md` and
 ## Development lines
 
 - Stable production: **v0.14.0**
-- Experimental visual/features: keep in the separate `demo` branch and promote selectively after testing.
+- Experimental visual/features: keep in a separate demo branch/package and promote selectively after testing.

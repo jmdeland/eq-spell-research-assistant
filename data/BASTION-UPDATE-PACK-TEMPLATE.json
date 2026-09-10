@@ -1,0 +1,52 @@
+{
+  "format": "eq-research-update-pack",
+  "version": 1,
+  "server": "Bastion",
+  "generated": "template",
+  "spellCatalog": [
+    {
+      "name": "Example Spell",
+      "classes": [
+        "CLR"
+      ],
+      "acquisition": [
+        "Research",
+        "Drop"
+      ],
+      "researchStatus": "CONFIRMED_UNRESOLVED",
+      "bastionUrl": "https://library.bastiongame.com/spells",
+      "notes": "Example only; delete this row before importing real data.",
+      "levelByClass": {
+        "CLR": 60
+      },
+      "era": "Example-era"
+    }
+  ],
+  "researchRecipes": [
+    {
+      "spell": "Example Spell",
+      "class": "CLR",
+      "level": 60,
+      "trivial": 200,
+      "components": [
+        {
+          "name": "Example Research Component",
+          "id": 12345
+        },
+        {
+          "name": "Quill",
+          "vendorBasic": true
+        },
+        {
+          "name": "Piece of Parchment",
+          "vendorBasic": true
+        }
+      ],
+      "containers": [
+        "Example Research Container"
+      ],
+      "sourceUrl": "https://library.bastiongame.com/recipes",
+      "complete": true
+    }
+  ]
+}

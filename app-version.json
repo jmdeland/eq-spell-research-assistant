@@ -1,4 +1,5 @@
 {
-  "name": "EverQuest Spell Research Assistant",
-  "version": "0.14.0"
+  "version": "0.14.0",
+  "channel": "stable",
+  "schema": 1
 }

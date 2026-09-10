@@ -1,0 +1,3231 @@
+{
+  "version": "0.12.7",
+  "scope": "Accuracy-first searchable catalog linked to exact Bastion recipe IDs and owned-component evidence",
+  "policy": "A spell can have multiple acquisition paths. Catalog presence never implies the research recipe is fully mapped.",
+  "spells": [
+    {
+      "name": "Acumen",
+      "classes": [
+        "SHM"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/600",
+      "notes": "Verified directly against the Bastion Library.",
+      "era": "Kunark-era",
+      "levelByClass": {
+        "SHM": 56
+      },
+      "researchEvidence": [
+        {
+          "itemId": 65349,
+          "itemName": "Words of Expertise",
+          "url": "https://library.bastiongame.com/items/65349"
+        }
+      ]
+    },
+    {
+      "name": "Aegis of Ro",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/602",
+      "notes": "Verified directly against the Bastion Library.",
+      "era": "Luclin-era",
+      "levelByClass": {
+        "MAG": 60
+      },
+      "researchEvidence": [
+        {
+          "itemId": 65349,
+          "itemName": "Words of Expertise",
+          "url": "https://library.bastiongame.com/items/65349"
+        }
+      ]
+    },
+    {
+      "name": "Aegolism",
+      "classes": [
+        "CLR"
+      ],
+      "acquisition": [
+        "Drop",
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes",
+      "notes": "Exact Bastion Research combine is now mapped: Quill + Piece of Parchment + Card of Bristlebane + Runed Emblem + Toharon's Memoir Pg. 22. Research trivial 216; yield 1.",
+      "era": "Velious-era",
+      "levelByClass": {
+        "CLR": 60
+      },
+      "researchRecipeTrivial": 216,
+      "researchEvidence": [
+        {
+          "type": "recipe-screenshot",
+          "label": "Bastion Library recipe screenshot supplied by user"
+        },
+        {
+          "type": "drop-source",
+          "label": "Bastion Velious drop sources",
+          "url": "https://library.bastiongame.com/zones/424"
+        }
+      ]
+    },
+    {
+      "name": "Allure",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 49
+      }
+    },
+    {
+      "name": "Animate Dead",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 20
+      }
+    },
+    {
+      "name": "Antidote",
+      "classes": [
+        "CLR"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/606",
+      "notes": "Exact Bastion Research recipe #606 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65428,
+          "itemName": "Yaeth's Compendium Pg. 98",
+          "url": "https://library.bastiongame.com/items/65428"
+        }
+      ],
+      "researchRecipeTrivial": 202
+    },
+    {
+      "name": "Augmentation of Death",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/611",
+      "notes": "Verified directly against the Bastion Library.",
+      "era": "Luclin-era",
+      "levelByClass": {
+        "NEC": 60
+      }
+    },
+    {
+      "name": "Avatar",
+      "classes": [],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/612",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65352,
+          "itemName": "Words of Virtue",
+          "url": "https://library.bastiongame.com/items/65352"
+        }
+      ]
+    },
+    {
+      "name": "Banshee Aura",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 16
+      }
+    },
+    {
+      "name": "Berserker Strength",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 20
+      }
+    },
+    {
+      "name": "Blanket of Forgetfulness",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 49
+      }
+    },
+    {
+      "name": "Blessed Armor of the Risen",
+      "classes": [],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/623",
+      "notes": "Bastion currently shows the created item as undiscovered.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65349,
+          "itemName": "Words of Expertise",
+          "url": "https://library.bastiongame.com/items/65349"
+        }
+      ]
+    },
+    {
+      "name": "Blessing of Aegolism",
+      "classes": [
+        "CLR"
+      ],
+      "acquisition": [
+        "Drop",
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/624",
+      "notes": "Exact Bastion Research recipe #624 is mapped.",
+      "era": "Luclin-era",
+      "levelByClass": {
+        "CLR": 60
+      },
+      "researchEvidence": [
+        {
+          "type": "recipe",
+          "recipeId": 624,
+          "url": "https://library.bastiongame.com/recipes/624"
+        },
+        {
+          "itemId": 65337,
+          "itemName": "Etched Signet",
+          "url": "https://library.bastiongame.com/items/65337"
+        },
+        {
+          "itemId": 65353,
+          "itemName": "Writ of Quellious",
+          "url": "https://library.bastiongame.com/items/65353"
+        },
+        {
+          "itemId": 65392,
+          "itemName": "Part of Yaeth's Compendium Pg. 26",
+          "url": "https://library.bastiongame.com/items/65392"
+        },
+        {
+          "itemId": 65393,
+          "itemName": "Part of Yaeth's Compendium Pg. 26",
+          "url": "https://library.bastiongame.com/items/65393"
+        }
+      ],
+      "researchRecipeTrivial": 222
+    },
+    {
+      "name": "Bond of Death",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 49
+      }
+    },
+    {
+      "name": "Bonds of Tunare",
+      "classes": [],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/627",
+      "notes": "Verified directly against the Bastion Library.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65349,
+          "itemName": "Words of Expertise",
+          "url": "https://library.bastiongame.com/items/65349"
+        }
+      ]
+    },
+    {
+      "name": "Breath of the Dead",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 24
+      }
+    },
+    {
+      "name": "Bristlebane`s Bundle",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/630",
+      "notes": "Exact Bastion Research recipe #630 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65348,
+          "itemName": "Words of Domination",
+          "url": "https://library.bastiongame.com/items/65348"
+        }
+      ],
+      "researchRecipeTrivial": 187
+    },
+    {
+      "name": "Cackling Bones",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 44
+      }
+    },
+    {
+      "name": "Call of Bones",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 34
+      }
+    },
+    {
+      "name": "Call Of The Hero",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/635",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65348,
+          "itemName": "Words of Domination",
+          "url": "https://library.bastiongame.com/items/65348"
+        }
+      ]
+    },
+    {
+      "name": "Cast Force",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "WIZ": 24
+      }
+    },
+    {
+      "name": "Circle of Force",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "WIZ": 34
+      }
+    },
+    {
+      "name": "Color Shift",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 20
+      }
+    },
+    {
+      "name": "Color Skew",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 44
+      }
+    },
+    {
+      "name": "Column of Lightning",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "WIZ": 24
+      }
+    },
+    {
+      "name": "Common Portal",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "WIZ": 39
+      }
+    },
+    {
+      "name": "Conjuration: Air",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 44
+      }
+    },
+    {
+      "name": "Conjuration: Earth",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 44
+      }
+    },
+    {
+      "name": "Conjuration: Fire",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 44
+      }
+    },
+    {
+      "name": "Conjuration: Water",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 44
+      }
+    },
+    {
+      "name": "Conjure Corpse",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/652",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65304,
+          "itemName": "Words of Constancy",
+          "url": "https://library.bastiongame.com/items/65304"
+        }
+      ]
+    },
+    {
+      "name": "Cornucopia",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 24
+      }
+    },
+    {
+      "name": "Dagger of Symbols",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 39
+      }
+    },
+    {
+      "name": "Dead Man Floating",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 44
+      }
+    },
+    {
+      "name": "Death Pact",
+      "classes": [
+        "CLR"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/661",
+      "notes": "Exact Bastion Research recipe #661 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65382,
+          "itemName": "Part of Toharon's Memoir Pg. 18",
+          "url": "https://library.bastiongame.com/items/65382"
+        }
+      ],
+      "researchRecipeTrivial": 227
+    },
+    {
+      "name": "Disempower",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 16
+      }
+    },
+    {
+      "name": "Dyzil's Deafening Decoy",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/674",
+      "notes": "Verified directly against the Bastion Library.",
+      "era": "Luclin-era",
+      "levelByClass": {
+        "MAG": 60
+      },
+      "researchEvidence": [
+        {
+          "itemId": 65349,
+          "itemName": "Words of Expertise",
+          "url": "https://library.bastiongame.com/items/65349"
+        }
+      ]
+    },
+    {
+      "name": "Electrical Charge",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/27828",
+      "notes": "Exact Bastion Research recipe #27828 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65282,
+          "itemName": "Rune of Impulse",
+          "url": "https://library.bastiongame.com/items/65282"
+        }
+      ],
+      "researchRecipeTrivial": 190
+    },
+    {
+      "name": "Emissary Of Thule",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/676",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65305,
+          "itemName": "Words of Control",
+          "url": "https://library.bastiongame.com/items/65305"
+        }
+      ]
+    },
+    {
+      "name": "Endure Magic",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 20
+      }
+    },
+    {
+      "name": "Enduring Breath",
+      "classes": [
+        "RNG",
+        "DRU",
+        "SHM",
+        "ENC",
+        "BST"
+      ],
+      "acquisition": [
+        "Learned"
+      ],
+      "researchStatus": "NONE",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/spells/86",
+      "notes": "Verified in the Bastion spell library.",
+      "era": null,
+      "levelByClass": {}
+    },
+    {
+      "name": "Energy Storm",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "WIZ": 29
+      }
+    },
+    {
+      "name": "Enslave Death",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/681",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65305,
+          "itemName": "Words of Control",
+          "url": "https://library.bastiongame.com/items/65305"
+        }
+      ]
+    },
+    {
+      "name": "Enstill",
+      "classes": [
+        "ENC",
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 29,
+        "WIZ": 20
+      }
+    },
+    {
+      "name": "Ethereal Light",
+      "classes": [],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/684",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65352,
+          "itemName": "Words of Virtue",
+          "url": "https://library.bastiongame.com/items/65352"
+        },
+        {
+          "itemId": 65390,
+          "itemName": "Part of Yaeth's Compendium Pg. 25",
+          "url": "https://library.bastiongame.com/items/65390"
+        },
+        {
+          "itemId": 65391,
+          "itemName": "Part of Yaeth's Compendium Pg. 25",
+          "url": "https://library.bastiongame.com/items/65391"
+        }
+      ]
+    },
+    {
+      "name": "Everfount",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 24
+      }
+    },
+    {
+      "name": "Extinguish Fatigue",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 44
+      }
+    },
+    {
+      "name": "Eye Of Tallon",
+      "classes": [
+        "MAG",
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/692",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65352,
+          "itemName": "Words of Virtue",
+          "url": "https://library.bastiongame.com/items/65352"
+        },
+        {
+          "itemId": 65290,
+          "itemName": "Rune of Tallon Zek",
+          "url": "https://library.bastiongame.com/items/65290"
+        }
+      ]
+    },
+    {
+      "name": "Feedback",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 29
+      }
+    },
+    {
+      "name": "Fire Spiral of Al'Kabor",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "WIZ": 20
+      }
+    },
+    {
+      "name": "Fixation of Ro",
+      "classes": [
+        "DRU"
+      ],
+      "acquisition": [
+        "Learned"
+      ],
+      "researchStatus": "UNKNOWN",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/spells/1436",
+      "notes": "Bastion spell page lists Druid 44; learned-from item is unresolved.",
+      "era": null,
+      "levelByClass": {
+        "DRU": 44
+      }
+    },
+    {
+      "name": "Force Spiral of Al'Kabor",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "WIZ": 39
+      }
+    },
+    {
+      "name": "Form Of The Hunter",
+      "classes": [
+        "DRU"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/703",
+      "notes": "Exact Bastion Research recipe #703 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65352,
+          "itemName": "Words of Virtue",
+          "url": "https://library.bastiongame.com/items/65352"
+        }
+      ],
+      "researchRecipeTrivial": 227
+    },
+    {
+      "name": "Gangrenous Touch Of Zum`uul",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/707",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65304,
+          "itemName": "Words of Constancy",
+          "url": "https://library.bastiongame.com/items/65304"
+        }
+      ]
+    },
+    {
+      "name": "Gift Of Brilliance",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/709",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65362,
+          "itemName": "Yaeth's Compendium Pg. 108",
+          "url": "https://library.bastiongame.com/items/65362"
+        }
+      ]
+    },
+    {
+      "name": "Glamorous Visage",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/714",
+      "notes": "Exact Bastion Research recipe #714 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65428,
+          "itemName": "Yaeth's Compendium Pg. 98",
+          "url": "https://library.bastiongame.com/items/65428"
+        }
+      ],
+      "researchRecipeTrivial": 216
+    },
+    {
+      "name": "Glamour of Tunare",
+      "classes": [
+        "DRU"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/1008723",
+      "notes": "Exact Bastion Research recipe #1008723 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65382,
+          "itemName": "Part of Toharon's Memoir Pg. 18",
+          "url": "https://library.bastiongame.com/items/65382"
+        }
+      ],
+      "researchRecipeTrivial": 152
+    },
+    {
+      "name": "Gravity Flux",
+      "classes": [
+        "ENC",
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 39,
+        "WIZ": 44
+      }
+    },
+    {
+      "name": "Greater Conjuration: Air",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 49
+      }
+    },
+    {
+      "name": "Greater Conjuration: Earth",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 49
+      }
+    },
+    {
+      "name": "Greater Conjuration: Fire",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 49
+      }
+    },
+    {
+      "name": "Greater Conjuration: Water",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 49
+      }
+    },
+    {
+      "name": "Greater Summoning: Air",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 29
+      }
+    },
+    {
+      "name": "Greater Summoning: Earth",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 29
+      }
+    },
+    {
+      "name": "Greater Summoning: Fire",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 29
+      }
+    },
+    {
+      "name": "Greater Summoning: Water",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 29
+      }
+    },
+    {
+      "name": "Harmshield",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 20
+      }
+    },
+    {
+      "name": "Haunting Corpse",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 24
+      }
+    },
+    {
+      "name": "Hungry Earth",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 16
+      }
+    },
+    {
+      "name": "Ice Comet",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "WIZ": 49
+      }
+    },
+    {
+      "name": "Identify",
+      "classes": [
+        "NEC",
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 20,
+        "WIZ": 16
+      }
+    },
+    {
+      "name": "Immobilize",
+      "classes": [
+        "ENC",
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 39,
+        "WIZ": 39
+      }
+    },
+    {
+      "name": "Improved Invis Vs Undead",
+      "classes": [
+        "NEC",
+        "SHD",
+        "PAL",
+        "CLR"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/743",
+      "notes": "Exact Bastion Research recipe #743 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65304,
+          "itemName": "Words of Constancy",
+          "url": "https://library.bastiongame.com/items/65304"
+        }
+      ],
+      "researchRecipeTrivial": 227
+    },
+    {
+      "name": "Infusion",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/748",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65304,
+          "itemName": "Words of Constancy",
+          "url": "https://library.bastiongame.com/items/65304"
+        }
+      ]
+    },
+    {
+      "name": "Insipid Weakness",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 34
+      }
+    },
+    {
+      "name": "Intensify Death",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 24
+      }
+    },
+    {
+      "name": "Invigor",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 24
+      }
+    },
+    {
+      "name": "Invoke Death",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 49
+      }
+    },
+    {
+      "name": "Invoke Shadow",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 34
+      }
+    },
+    {
+      "name": "Khura's Focusing",
+      "classes": [],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/759",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65368,
+          "itemName": "Yaeth's Compendium Pg. 115",
+          "url": "https://library.bastiongame.com/items/65368"
+        }
+      ]
+    },
+    {
+      "name": "Koadic's Endless Intellect",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/760",
+      "notes": "Same-name page halves are kept ID-aware; Bastion requires two Pg.25 and two Pg.26 components.",
+      "era": "Luclin-era",
+      "levelByClass": {
+        "ENC": 60
+      },
+      "researchEvidence": [
+        {
+          "itemId": 65390,
+          "itemName": "Part of Yaeth's Compendium Pg. 25",
+          "url": "https://library.bastiongame.com/items/65390"
+        },
+        {
+          "itemId": 65391,
+          "itemName": "Part of Yaeth's Compendium Pg. 25",
+          "url": "https://library.bastiongame.com/items/65391"
+        },
+        {
+          "itemId": 65392,
+          "itemName": "Part of Yaeth's Compendium Pg. 26",
+          "url": "https://library.bastiongame.com/items/65392"
+        },
+        {
+          "itemId": 65393,
+          "itemName": "Part of Yaeth's Compendium Pg. 26",
+          "url": "https://library.bastiongame.com/items/65393"
+        }
+      ]
+    },
+    {
+      "name": "Lava Storm",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "WIZ": 34
+      }
+    },
+    {
+      "name": "Legacy of Thorn",
+      "classes": [],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/762",
+      "notes": "Verified directly against the Bastion Library.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65349,
+          "itemName": "Words of Expertise",
+          "url": "https://library.bastiongame.com/items/65349"
+        }
+      ]
+    },
+    {
+      "name": "Lesser Conjuration: Earth",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 39
+      }
+    },
+    {
+      "name": "Lesser Conjuration: Water",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 39
+      }
+    },
+    {
+      "name": "Lesser Summoning: Air",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 20
+      }
+    },
+    {
+      "name": "Lesser Summoning: Earth",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 20
+      }
+    },
+    {
+      "name": "Lesser Summoning: Fire",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 20
+      }
+    },
+    {
+      "name": "Lesser Summoning: Water",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 20
+      }
+    },
+    {
+      "name": "Levitate",
+      "classes": [
+        "ENC",
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 16,
+        "WIZ": 24
+      }
+    },
+    {
+      "name": "Lich",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 49
+      }
+    },
+    {
+      "name": "Lightning Storm",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "WIZ": 24
+      }
+    },
+    {
+      "name": "Maelstrom Of Electricity",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/778",
+      "notes": "Exact Bastion Research recipe #778 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65352,
+          "itemName": "Words of Virtue",
+          "url": "https://library.bastiongame.com/items/65352"
+        }
+      ],
+      "researchRecipeTrivial": 255
+    },
+    {
+      "name": "Mala",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/779",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65352,
+          "itemName": "Words of Virtue",
+          "url": "https://library.bastiongame.com/items/65352"
+        }
+      ]
+    },
+    {
+      "name": "Malignant Dead",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 39
+      }
+    },
+    {
+      "name": "Malo",
+      "classes": [],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/781",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65362,
+          "itemName": "Yaeth's Compendium Pg. 108",
+          "url": "https://library.bastiongame.com/items/65362"
+        }
+      ]
+    },
+    {
+      "name": "Malosini",
+      "classes": [
+        "MAG",
+        "SHM"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/782",
+      "notes": "Exact Bastion Research recipe #782 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65352,
+          "itemName": "Words of Virtue",
+          "url": "https://library.bastiongame.com/items/65352"
+        }
+      ],
+      "researchRecipeTrivial": 207
+    },
+    {
+      "name": "Mana Sieve",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 34
+      }
+    },
+    {
+      "name": "Manasink",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/784",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65282,
+          "itemName": "Rune of Impulse",
+          "url": "https://library.bastiongame.com/items/65282"
+        }
+      ]
+    },
+    {
+      "name": "Manastorm",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/785",
+      "notes": "Verified directly against the Bastion Library.",
+      "era": "Luclin-era",
+      "levelByClass": {
+        "MAG": 60
+      },
+      "researchEvidence": [
+        {
+          "itemId": 65349,
+          "itemName": "Words of Expertise",
+          "url": "https://library.bastiongame.com/items/65349"
+        }
+      ]
+    },
+    {
+      "name": "Mark of Karn",
+      "classes": [
+        "CLR"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/786",
+      "notes": "Verified directly against the Bastion Library.",
+      "era": "Kunark-era",
+      "levelByClass": {
+        "CLR": 49
+      },
+      "researchEvidence": [
+        {
+          "itemId": 65349,
+          "itemName": "Words of Expertise",
+          "url": "https://library.bastiongame.com/items/65349"
+        },
+        {
+          "itemId": 65382,
+          "itemName": "Part of Toharon's Memoir Pg. 18",
+          "url": "https://library.bastiongame.com/items/65382"
+        }
+      ]
+    },
+    {
+      "name": "Mask Of The Hunter",
+      "classes": [],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/789",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65368,
+          "itemName": "Yaeth's Compendium Pg. 115",
+          "url": "https://library.bastiongame.com/items/65368"
+        }
+      ]
+    },
+    {
+      "name": "Mesmerization",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 16
+      }
+    },
+    {
+      "name": "Mind Wipe",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 39
+      }
+    },
+    {
+      "name": "Minor Conjuration: Air",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 34
+      }
+    },
+    {
+      "name": "Minor Conjuration: Fire",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 34
+      }
+    },
+    {
+      "name": "Minor Summoning: Air",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 16
+      }
+    },
+    {
+      "name": "Minor Summoning: Earth",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 16
+      }
+    },
+    {
+      "name": "Minor Summoning: Fire",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 16
+      }
+    },
+    {
+      "name": "Minor Summoning: Water",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 16
+      }
+    },
+    {
+      "name": "Naltron's Mark",
+      "classes": [
+        "CLR"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/1008724",
+      "notes": "Exact Bastion Research recipe #1008724 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65382,
+          "itemName": "Part of Toharon's Memoir Pg. 18",
+          "url": "https://library.bastiongame.com/items/65382"
+        }
+      ],
+      "researchRecipeTrivial": 203
+    },
+    {
+      "name": "Nullify Magic",
+      "classes": [
+        "ENC",
+        "MAG",
+        "NEC",
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 29,
+        "MAG": 34,
+        "NEC": 39,
+        "WIZ": 34
+      }
+    },
+    {
+      "name": "Paralyzing Earth",
+      "classes": [
+        "ENC",
+        "NEC",
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 49,
+        "NEC": 49,
+        "WIZ": 49
+      }
+    },
+    {
+      "name": "Pillage Enchantment",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 44
+      }
+    },
+    {
+      "name": "Pillar of Fire",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "WIZ": 16
+      }
+    },
+    {
+      "name": "Plague",
+      "classes": [
+        "SHM",
+        "NEC",
+        "BST"
+      ],
+      "acquisition": [
+        "Learned"
+      ],
+      "researchStatus": "NONE",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/spells/32",
+      "notes": "Bastion spell page lists Shaman 49, Necromancer 52 and Beastlord 65.",
+      "era": null,
+      "levelByClass": {
+        "SHM": 49,
+        "NEC": 52,
+        "BST": 65
+      }
+    },
+    {
+      "name": "Project Lightning",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "WIZ": 16
+      }
+    },
+    {
+      "name": "Quiver Of Marr",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/818",
+      "notes": "Exact Bastion Research recipe #818 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65348,
+          "itemName": "Words of Domination",
+          "url": "https://library.bastiongame.com/items/65348"
+        }
+      ],
+      "researchRecipeTrivial": 192
+    },
+    {
+      "name": "Radiant Visage",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 34
+      }
+    },
+    {
+      "name": "Rage Of Zomm",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/821",
+      "notes": "Exact Bastion Research recipe #821 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65348,
+          "itemName": "Words of Domination",
+          "url": "https://library.bastiongame.com/items/65348"
+        }
+      ],
+      "researchRecipeTrivial": 202
+    },
+    {
+      "name": "Renew Bones",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 29
+      }
+    },
+    {
+      "name": "Reoccurring Amnesia",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 49
+      }
+    },
+    {
+      "name": "Resist Magic",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 39
+      }
+    },
+    {
+      "name": "Restless Bones",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 16
+      }
+    },
+    {
+      "name": "Scars Of Sigil",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/833",
+      "notes": "Exact Bastion Research recipe #833 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65348,
+          "itemName": "Words of Domination",
+          "url": "https://library.bastiongame.com/items/65348"
+        }
+      ],
+      "researchRecipeTrivial": 196
+    },
+    {
+      "name": "Shadow Sight",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 24
+      }
+    },
+    {
+      "name": "Shadow Vortex",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 20
+      }
+    },
+    {
+      "name": "Shiftless Deeds",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 44
+      }
+    },
+    {
+      "name": "Shock Spiral of Al'Kabor",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "WIZ": 29
+      }
+    },
+    {
+      "name": "Strip Enchantment",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 24
+      }
+    },
+    {
+      "name": "Summon Coldstone",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 29
+      }
+    },
+    {
+      "name": "Summon Dead",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 29
+      }
+    },
+    {
+      "name": "Summon Heatstone",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 16
+      }
+    },
+    {
+      "name": "Summon Ring of Flight",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 39
+      }
+    },
+    {
+      "name": "Summoning: Air",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 24
+      }
+    },
+    {
+      "name": "Summoning: Earth",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 24
+      }
+    },
+    {
+      "name": "Summoning: Fire",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 24
+      }
+    },
+    {
+      "name": "Summoning: Water",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "MAG": 24
+      }
+    },
+    {
+      "name": "Supernova",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "WIZ": 49
+      }
+    },
+    {
+      "name": "Surge of Enfeeblement",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 34
+      }
+    },
+    {
+      "name": "Swift like the Wind",
+      "classes": [
+        "SHM",
+        "ENC"
+      ],
+      "acquisition": [
+        "Learned"
+      ],
+      "researchStatus": "NONE",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/spells/172",
+      "notes": "Bastion spell page lists Shaman 63 and Enchanter 49.",
+      "era": null,
+      "levelByClass": {
+        "SHM": 63,
+        "ENC": 49
+      }
+    },
+    {
+      "name": "Symbol of Ryltan",
+      "classes": [
+        "CLR",
+        "PAL"
+      ],
+      "acquisition": [
+        "Learned"
+      ],
+      "researchStatus": "NONE",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/spells/486",
+      "notes": "Bastion spell page lists Cleric 24 and Paladin 39.",
+      "era": null,
+      "levelByClass": {
+        "CLR": 24,
+        "PAL": 39
+      }
+    },
+    {
+      "name": "Tepid Deeds",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 24
+      }
+    },
+    {
+      "name": "The Unspoken Word",
+      "classes": [],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/875",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65282,
+          "itemName": "Rune of Impulse",
+          "url": "https://library.bastiongame.com/items/65282"
+        }
+      ]
+    },
+    {
+      "name": "Thrall Of Bones",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/877",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65305,
+          "itemName": "Words of Control",
+          "url": "https://library.bastiongame.com/items/65305"
+        }
+      ]
+    },
+    {
+      "name": "Thunderclap",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "WIZ": 34
+      }
+    },
+    {
+      "name": "Tigir's Insects",
+      "classes": [
+        "SHM"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/879",
+      "notes": "Verified directly against the Bastion Library.",
+      "era": "Kunark-era",
+      "levelByClass": {
+        "SHM": 54
+      },
+      "researchEvidence": [
+        {
+          "itemId": 65349,
+          "itemName": "Words of Expertise",
+          "url": "https://library.bastiongame.com/items/65349"
+        }
+      ]
+    },
+    {
+      "name": "Tox Portal",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "WIZ": 29
+      }
+    },
+    {
+      "name": "Translocate",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/885",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65282,
+          "itemName": "Rune of Impulse",
+          "url": "https://library.bastiongame.com/items/65282"
+        }
+      ]
+    },
+    {
+      "name": "Transon's Phantasmal Protection",
+      "classes": [],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "PARTIAL",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/10255",
+      "notes": "Recipe exists in Bastion; v0.3 records only ingredients exposed by the verified source snapshot available during this build.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65349,
+          "itemName": "Words of Expertise",
+          "url": "https://library.bastiongame.com/items/65349"
+        }
+      ]
+    },
+    {
+      "name": "Transon`s Elemental Renewal",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/887",
+      "notes": "Exact Bastion Research recipe #887 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65352,
+          "itemName": "Words of Virtue",
+          "url": "https://library.bastiongame.com/items/65352"
+        }
+      ],
+      "researchRecipeTrivial": 227
+    },
+    {
+      "name": "Ultravision",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "ENC": 29
+      }
+    },
+    {
+      "name": "Umbra",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/1008726",
+      "notes": "Exact Bastion Research recipe #1008726 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65382,
+          "itemName": "Part of Toharon's Memoir Pg. 18",
+          "url": "https://library.bastiongame.com/items/65382"
+        }
+      ],
+      "researchRecipeTrivial": 190
+    },
+    {
+      "name": "Vampiric Curse",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 29
+      }
+    },
+    {
+      "name": "Visions Of Grandeur",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/894",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65368,
+          "itemName": "Yaeth's Compendium Pg. 115",
+          "url": "https://library.bastiongame.com/items/65368"
+        }
+      ]
+    },
+    {
+      "name": "Vocarate: Water",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/895",
+      "notes": "Exact Bastion Research recipe #895 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65348,
+          "itemName": "Words of Domination",
+          "url": "https://library.bastiongame.com/items/65348"
+        }
+      ],
+      "researchRecipeTrivial": 196
+    },
+    {
+      "name": "Voice Graft",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 16
+      }
+    },
+    {
+      "name": "Winds Of Gelid",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/901",
+      "notes": "Exact Bastion Research recipe #901 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65282,
+          "itemName": "Rune of Impulse",
+          "url": "https://library.bastiongame.com/items/65282"
+        }
+      ],
+      "researchRecipeTrivial": 227
+    },
+    {
+      "name": "Word Of Redemption",
+      "classes": [],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/902",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65362,
+          "itemName": "Yaeth's Compendium Pg. 108",
+          "url": "https://library.bastiongame.com/items/65362"
+        }
+      ]
+    },
+    {
+      "name": "Word of Shadow",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 20
+      }
+    },
+    {
+      "name": "Word of Souls",
+      "classes": [
+        "NEC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "NEC": 39
+      }
+    },
+    {
+      "name": "Wrath of Al'Kabor",
+      "classes": [
+        "WIZ"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Default research recipe pack",
+      "bastionUrl": null,
+      "notes": "Mapped by the default research recipe pack.",
+      "era": null,
+      "levelByClass": {
+        "WIZ": 49
+      }
+    },
+    {
+      "name": "Wrath Of The Elements",
+      "classes": [
+        "MAG"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/908",
+      "notes": "Exact Bastion Research recipe #908 mapped in v0.10.2.",
+      "era": null,
+      "levelByClass": {},
+      "researchEvidence": [
+        {
+          "itemId": 65348,
+          "itemName": "Words of Domination",
+          "url": "https://library.bastiongame.com/items/65348"
+        }
+      ],
+      "researchRecipeTrivial": 202
+    },
+    {
+      "name": "Wind Of Tashani",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/899",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchRecipeTrivial": 202
+    },
+    {
+      "name": "Yaulp IV",
+      "classes": [
+        "CLR"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/909",
+      "notes": "",
+      "era": null,
+      "levelByClass": {},
+      "researchRecipeTrivial": 227
+    },
+    {
+      "name": "Remove Greater Curse",
+      "classes": [
+        "ENC"
+      ],
+      "acquisition": [
+        "Research"
+      ],
+      "researchStatus": "MAPPED",
+      "source": "Bastion Library",
+      "bastionUrl": "https://library.bastiongame.com/recipes/825",
+      "notes": "Exact Bastion Research recipe #825 mapped.",
+      "era": null,
+      "levelByClass": {},
+      "researchRecipeTrivial": 176
+    }
+  ],
+  "importSchema": {
+    "spellCatalog": {
+      "required": [
+        "name"
+      ],
+      "optional": [
+        "classes",
+        "acquisition",
+        "researchStatus",
+        "bastionUrl",
+        "notes",
+        "era",
+        "levelByClass"
+      ]
+    },
+    "researchRecipe": {
+      "required": [
+        "spell",
+        "components"
+      ],
+      "optional": [
+        "class",
+        "level",
+        "trivial",
+        "containers",
+        "sourceUrl",
+        "era",
+        "notes",
+        "complete"
+      ]
+    }
+  }
+}
