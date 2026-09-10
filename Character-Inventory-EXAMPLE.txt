@@ -1,0 +1,4 @@
+Location	Name	ID	Count	Slots
+General1	Words of Expertise	65349	2	0
+General2	Runed Emblem	65342	1	0
+Bank1	Part of Toharon's Memoir Pg. 22	65389	1	0

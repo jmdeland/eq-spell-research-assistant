@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "channel": "stable",
+  "version": "0.14.0",
+  "releaseNotesUrl": "https://github.com/OWNER/REPO/releases/tag/v0.14.0",
+  "downloadUrl": "https://github.com/OWNER/REPO/releases/download/v0.14.0/eq_spell_research_assistant_v0.14.0.zip",
+  "sha256": "REPLACE_WITH_RELEASE_ZIP_SHA256"
+}
