@@ -1,5 +1,5 @@
-﻿{
-    "logPath":  "D:\\Program Files (x86)\\Sony\\Wayfarers Haven v3.2\\Logs\\eqlog_Bromm_Bastion.txt",
-    "port":  8765,
-    "startAtEnd":  true
+{
+  "logPath": "",
+  "port": 8765,
+  "startAtEnd": true
 }
