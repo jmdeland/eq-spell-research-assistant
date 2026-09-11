@@ -33,7 +33,7 @@ function Strip-Html([string]$html) {
     return ([regex]::Replace($x,'\s+',' ')).Trim()
 }
 function Invoke-Bastion([string]$url) {
-    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Spell-Research-Assistant/0.12"}).Content
+    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Spell-Research-Assistant/0.15.0"}).Content
 }
 function Parse-RecipePage([int]$id,[string]$html) {
     $plain=Strip-Html $html
@@ -386,8 +386,233 @@ function Parse-MageloInventory([string]$html,[string]$characterName){
     }
 }
 
+
+
+$updateRepo="jmdeland/eq-spell-research-assistant"
+$updateApi="https://api.github.com/repos/$updateRepo/releases/latest"
+$updateStage=Join-Path $root "_updates"
+function Get-AppVersionInfo {
+    $versionPath=Join-Path $root "app-version.json"
+    if(Test-Path -LiteralPath $versionPath){
+        try{return (Get-Content -LiteralPath $versionPath -Raw | ConvertFrom-Json)}catch{}
+    }
+    return [pscustomobject]@{version="0.15.0";channel="stable"}
+}
+function Convert-VersionCore([string]$version){
+    $clean=($version -replace '^v','').Split('-')[0]
+    $parts=@($clean.Split('.') | ForEach-Object { $n=0; if([int]::TryParse($_,[ref]$n)){$n}else{0} })
+    while($parts.Count -lt 3){$parts += 0}
+    return [version]("{0}.{1}.{2}" -f $parts[0],$parts[1],$parts[2])
+}
+function Get-LatestGitHubRelease {
+    $headers=@{"User-Agent"="EQ-Spell-Research-Assistant/0.15.0";"Accept"="application/vnd.github+json"}
+    return Invoke-RestMethod -UseBasicParsing -Uri $updateApi -TimeoutSec 45 -Headers $headers
+}
+function Get-UpdateInfo {
+    $installed=Get-AppVersionInfo
+    $release=Get-LatestGitHubRelease
+    $asset=@($release.assets | Where-Object {$_.name -match '^eq_spell_research_assistant_v.+\.zip$'} | Select-Object -First 1)
+    if(-not $asset -or $asset.Count -eq 0){throw "Latest GitHub release has no updater-compatible ZIP asset."}
+    $asset=$asset[0]
+    $latestVersion=([string]$release.tag_name -replace '^v','')
+    $stableInstalled=if($installed.stableBaseVersion){[string]$installed.stableBaseVersion}else{([string]$installed.version -replace '-.*$','')}
+    $available=((Convert-VersionCore $latestVersion) -gt (Convert-VersionCore $stableInstalled))
+    $digest=[string]$asset.digest
+    $sha=""
+    if($digest -match '^sha256:(?<h>[0-9a-fA-F]{64})$'){$sha=$Matches['h'].ToLowerInvariant()}
+    return [pscustomobject]@{
+        ok=$true
+        installedVersion=[string]$installed.version
+        installedStableVersion=$stableInstalled
+        channel=[string]$installed.channel
+        latestVersion=$latestVersion
+        latestTag=[string]$release.tag_name
+        name=[string]$release.name
+        body=[string]$release.body
+        releaseUrl=[string]$release.html_url
+        publishedAt=[string]$release.published_at
+        updateAvailable=$available
+        assetName=[string]$asset.name
+        assetUrl=[string]$asset.browser_download_url
+        assetSize=[long]$asset.size
+        expectedSha256=$sha
+    }
+}
+function Download-AndVerifyLatestUpdate {
+    $info=Get-UpdateInfo
+    if(-not $info.expectedSha256){throw "GitHub did not provide a SHA-256 digest for the release asset; refusing unverified download."}
+    if(-not(Test-Path -LiteralPath $updateStage)){New-Item -ItemType Directory -Path $updateStage | Out-Null}
+    $dest=Join-Path $updateStage $info.assetName
+    $tmp=$dest+".download"
+    if(Test-Path -LiteralPath $tmp){Remove-Item -LiteralPath $tmp -Force}
+    $headers=@{"User-Agent"="EQ-Spell-Research-Assistant/0.15.0"}
+    try{
+        Invoke-WebRequest -UseBasicParsing -Uri $info.assetUrl -OutFile $tmp -TimeoutSec 120 -Headers $headers
+        $actual=(Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash.ToLowerInvariant()
+        if($actual -ne $info.expectedSha256){throw ("SHA-256 mismatch. Expected {0}; got {1}." -f $info.expectedSha256,$actual)}
+        if(Test-Path -LiteralPath $dest){Remove-Item -LiteralPath $dest -Force}
+        Move-Item -LiteralPath $tmp -Destination $dest
+        $size=(Get-Item -LiteralPath $dest).Length
+        $sizeText=if($size -ge 1MB){"{0:N2} MB" -f ($size/1MB)}else{"{0:N0} KB" -f ($size/1KB)}
+        return [pscustomobject]@{ok=$true;fileName=$info.assetName;path=$dest;sha256=$actual;size=$size;sizeText=$sizeText;latestTag=$info.latestTag}
+    }catch{
+        if(Test-Path -LiteralPath $tmp){Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue}
+        throw
+    }
+}
+
+
+function Get-UpdateState {
+    $result=$null
+    $resultPath=Join-Path $root "update-result.json"
+    if(Test-Path -LiteralPath $resultPath){try{$result=Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json}catch{}}
+    $parent=Split-Path -Parent $root
+    $leaf=Split-Path -Leaf $root
+    $backups=@()
+    try{
+        $backups=@(Get-ChildItem -LiteralPath $parent -Directory -ErrorAction SilentlyContinue |
+            Where-Object {$_.Name -like ($leaf + "_backup_*")} |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 10 |
+            ForEach-Object {[pscustomobject]@{path=$_.FullName;name=$_.Name;lastWriteTime=$_.LastWriteTime.ToString("o")}})
+    }catch{}
+    return [pscustomobject]@{ok=$true;result=$result;backups=$backups}
+}
+
+function Start-SafeVerifiedUpdate {
+    $info=Get-UpdateInfo
+    if(-not $info.expectedSha256){throw "GitHub did not provide a SHA-256 digest; refusing install."}
+    $zipPath=Join-Path $updateStage $info.assetName
+    if(-not(Test-Path -LiteralPath $zipPath)){throw "Verified update ZIP is not staged. Download and verify it first."}
+    $actual=(Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if($actual -ne $info.expectedSha256){throw ("Staged ZIP is no longer valid. Expected {0}; got {1}. Download it again." -f $info.expectedSha256,$actual)}
+
+    $parent=Split-Path -Parent $root
+    $leaf=Split-Path -Leaf $root
+    $stamp=Get-Date -Format "yyyyMMdd-HHmmss"
+    $backupPath=Join-Path $parent ($leaf + "_backup_" + $stamp)
+    if(Test-Path -LiteralPath $backupPath){throw "Backup path already exists: $backupPath"}
+
+    $updaterPath=Join-Path $env:TEMP ("EQSpellResearchUpdater_" + [guid]::NewGuid().ToString("N") + ".ps1")
+    $pidToWait=$PID
+    $script=@'
+param(
+ [Parameter(Mandatory=$true)][string]$Root,
+ [Parameter(Mandatory=$true)][string]$ZipPath,
+ [Parameter(Mandatory=$true)][string]$ExpectedSha256,
+ [Parameter(Mandatory=$true)][string]$BackupPath,
+ [Parameter(Mandatory=$true)][int]$WaitForPid,
+ [Parameter(Mandatory=$true)][string]$LatestTag
+)
+$ErrorActionPreference="Stop"
+$work=Join-Path $env:TEMP ("EQSpellResearchInstall_" + [guid]::NewGuid().ToString("N"))
+$backupMade=$false
+$logPath=$BackupPath + ".updater.log"
+function Write-UpdaterLog([string]$Message){
+    try{Add-Content -LiteralPath $logPath -Value ((Get-Date).ToString("o") + " " + $Message) -Encoding UTF8}catch{}
+}
+try {
+    Set-Location -LiteralPath $env:TEMP
+    Write-UpdaterLog ("Updater started. Root={0}; Zip={1}; Backup={2}" -f $Root,$ZipPath,$BackupPath)
+    for($i=0;$i -lt 120;$i++){
+        $p=Get-Process -Id $WaitForPid -ErrorAction SilentlyContinue
+        if(-not $p){break}
+        Start-Sleep -Milliseconds 250
+    }
+    if(Get-Process -Id $WaitForPid -ErrorAction SilentlyContinue){throw "The running companion did not exit in time."}
+
+    $actual=(Get-FileHash -LiteralPath $ZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if($actual -ne $ExpectedSha256.ToLowerInvariant()){throw "SHA-256 verification failed immediately before install."}
+
+    New-Item -ItemType Directory -Path $work | Out-Null
+    Expand-Archive -LiteralPath $ZipPath -DestinationPath $work -Force
+    $children=@(Get-ChildItem -LiteralPath $work -Force)
+    if($children.Count -eq 1 -and $children[0].PSIsContainer){$payload=$children[0].FullName}else{$payload=$work}
+    if(-not(Test-Path -LiteralPath (Join-Path $payload "START-LIVE-MONITOR.bat"))){throw "Update package does not contain START-LIVE-MONITOR.bat at its application root."}
+
+    $preservedConfig=$null
+    $configPath=Join-Path $Root "monitor-config.json"
+    if(Test-Path -LiteralPath $configPath){$preservedConfig=Get-Content -LiteralPath $configPath -Raw}
+
+    Write-UpdaterLog "Companion exited and package verified. Moving current application folder to backup."
+    Move-Item -LiteralPath $Root -Destination $BackupPath
+    $backupMade=$true
+    Write-UpdaterLog "Backup move completed. Installing replacement files."
+    New-Item -ItemType Directory -Path $Root | Out-Null
+    Get-ChildItem -LiteralPath $payload -Force | ForEach-Object {
+        Move-Item -LiteralPath $_.FullName -Destination $Root -Force
+    }
+    if($preservedConfig -ne $null){Set-Content -LiteralPath (Join-Path $Root "monitor-config.json") -Value $preservedConfig -Encoding UTF8}
+
+    $result=[pscustomobject]@{
+        ok=$true
+        installedTag=$LatestTag
+        backupPath=$BackupPath
+        installedAt=(Get-Date).ToString("o")
+    } | ConvertTo-Json -Depth 4
+    $result | Set-Content -LiteralPath (Join-Path $Root "update-result.json") -Encoding UTF8
+
+    # Keep only the two newest sibling backups for this installation path.
+    try {
+        $rootParent=Split-Path -Parent $Root
+        $rootLeaf=Split-Path -Leaf $Root
+        $matching=@(Get-ChildItem -LiteralPath $rootParent -Directory -ErrorAction SilentlyContinue |
+            Where-Object {$_.Name -like ($rootLeaf + "_backup_*")} |
+            Sort-Object LastWriteTime -Descending)
+        if($matching.Count -gt 2){
+            @($matching | Select-Object -Skip 2) | ForEach-Object {
+                Write-UpdaterLog ("Removing old backup by retention policy: " + $_.FullName)
+                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    } catch { Write-UpdaterLog ("Backup retention warning: " + $_.Exception.Message) }
+
+    $bat=Join-Path $Root "START-LIVE-MONITOR.bat"
+    $restartCommand='start "" "{0}"' -f $bat
+    Write-UpdaterLog "Install completed. Restarting application."
+    Start-Process -FilePath "cmd.exe" -ArgumentList @("/c",$restartCommand) -WorkingDirectory $Root
+} catch {
+    $message=$_.Exception.Message
+    Write-UpdaterLog ("INSTALL FAILED: " + $message)
+    try {
+        if($backupMade -and (Test-Path -LiteralPath $BackupPath)){
+            if(Test-Path -LiteralPath $Root){Remove-Item -LiteralPath $Root -Recurse -Force -ErrorAction SilentlyContinue}
+            Move-Item -LiteralPath $BackupPath -Destination $Root
+            Write-UpdaterLog "Rollback restored the original application folder."
+        }
+        $err=[pscustomobject]@{ok=$false;error=$message;failedAt=(Get-Date).ToString("o")} | ConvertTo-Json -Depth 4
+        if(Test-Path -LiteralPath $Root){
+            $err | Set-Content -LiteralPath (Join-Path $Root "update-result.json") -Encoding UTF8
+            $rollbackBat=Join-Path $Root "START-LIVE-MONITOR.bat"
+            if(Test-Path -LiteralPath $rollbackBat){
+                $rollbackCommand='start "" "{0}"' -f $rollbackBat
+                Start-Process -FilePath "cmd.exe" -ArgumentList @("/c",$rollbackCommand) -WorkingDirectory $Root
+            }
+        }
+    } catch { Write-UpdaterLog ("ROLLBACK ERROR: " + $_.Exception.Message) }
+} finally {
+    if(Test-Path -LiteralPath $work){Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue}
+    Remove-Item -LiteralPath $MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue
+}
+'@
+    Set-Content -LiteralPath $updaterPath -Value $script -Encoding UTF8
+    $updaterArgs=@(
+        "-NoProfile","-ExecutionPolicy","Bypass",
+        "-File",('"{0}"' -f $updaterPath),
+        "-Root",('"{0}"' -f $root),
+        "-ZipPath",('"{0}"' -f $zipPath),
+        "-ExpectedSha256",('"{0}"' -f $info.expectedSha256),
+        "-BackupPath",('"{0}"' -f $backupPath),
+        "-WaitForPid",$pidToWait,
+        "-LatestTag",('"{0}"' -f $info.latestTag)
+    )
+    Start-Process powershell.exe -WindowStyle Normal -WorkingDirectory $env:TEMP -ArgumentList $updaterArgs
+    return [pscustomobject]@{ok=$true;latestTag=$info.latestTag;backupPath=$backupPath;zipPath=$zipPath;sha256=$actual}
+}
+
+$shutdownForUpdate=$false
 $listener=New-Object Net.HttpListener;$prefix="http://127.0.0.1:$port/";$listener.Prefixes.Add($prefix);$listener.Start()
-Write-Host "";Write-Host "EverQuest Spell Research Assistant v0.14.0";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
+Write-Host "";Write-Host "EverQuest Spell Research Assistant v0.15.0";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
 Start-Process ($prefix + "index.html")
 
 try{
@@ -402,6 +627,30 @@ while($listener.IsListening){
     if($req.HttpMethod -eq "OPTIONS"){$res.StatusCode=204;$res.OutputStream.Close();continue}
     try{
         $path=$req.Url.AbsolutePath
+
+
+        if($path -eq "/api/update-state"){
+            try{$payload=(Get-UpdateState | ConvertTo-Json -Depth 8)}
+            catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
+            $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
+        }
+        if($path -eq "/api/update-check"){
+            try{$payload=(Get-UpdateInfo | ConvertTo-Json -Depth 8)}
+            catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
+            $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
+        }
+        if($path -eq "/api/update-download"){
+            try{$payload=(Download-AndVerifyLatestUpdate | ConvertTo-Json -Depth 8)}
+            catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
+            $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
+        }
+        if($path -eq "/api/update-install"){
+            try{$result=Start-SafeVerifiedUpdate;$payload=($result|ConvertTo-Json -Depth 8);$shutdownForUpdate=$true}
+            catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
+            $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);$res.OutputStream.Close()
+            if($shutdownForUpdate){Start-Sleep -Milliseconds 750;$listener.Stop();break}
+            continue
+        }
 
         if($path -eq "/api/status"){
             $sync=$null;if(Test-Path $syncDataPath){try{$sync=Get-Content $syncDataPath -Raw|ConvertFrom-Json}catch{}}

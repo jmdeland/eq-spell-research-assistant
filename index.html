@@ -1,12 +1,35 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>EverQuest Spell Research Assistant</title><link rel="stylesheet" href="styles.css"></head><body>
-<header><div><div class="eyebrow">EVERQUEST RESEARCH TOOL</div><h1>Spell Research Assistant</h1><p>Load your inventory, choose a class, see what you can make, and plan Research skill-ups.</p></div><div class="version">v0.14.0</div></header>
+<header><div><div class="eyebrow">EVERQUEST RESEARCH TOOL</div><h1>Spell Research Assistant</h1><p>Load your inventory, choose a class, see what you can make, and plan Research skill-ups.</p></div><div class="version">v0.15.0</div></header>
 <section class="quick-lookup-bar"><div class="quick-inner">
 <div><strong>Quick Loot Lookup</strong><small>What did you just find?</small></div>
 <input id="quickLootSearch" placeholder="Type item name or item ID…"><button id="quickLootButton">Find Research Uses</button>
 </div><div id="quickLootResult" class="quick-result"></div></section>
 <main>
+<section class="panel update-panel" id="updatePanel">
+ <div class="panel-title">
+  <div><h2>Application Updates</h2><p>Check the public GitHub stable channel. Updates are downloaded, SHA-256 verified, backed up, installed, and restarted through the local companion.</p></div>
+  <span id="updateStatusBadge" class="live-status offline">NOT CHECKED</span>
+ </div>
+ <div class="update-actions">
+  <button id="checkForUpdates">Check for Updates</button>
+  <button id="downloadLatestUpdate" class="ghost" disabled>Download & Verify Update</button>
+  <button id="installVerifiedUpdate" class="danger" disabled>Install Update</button>
+  <a id="openReleasePage" class="button-link ghost hidden" href="#" target="_blank" rel="noopener">Open Release Page ↗</a>
+ </div>
+ <div id="updateVersionGrid" class="update-version-grid">
+   <div><span>Demo build</span><strong>v0.15.0</strong></div>
+   <div><span>Stable baseline</span><strong>v0.14.0</strong></div>
+   <div><span>Latest stable</span><strong id="latestStableVersion">Not checked</strong></div>
+ </div>
+ <div id="updateStatus" class="status muted">Updater ready. Check GitHub for a newer stable release.</div>
+ <div id="previousUpdateResult" class="update-result-card hidden"></div>
+ <div id="backupSummary" class="update-backup-summary hidden"></div>
+ <div id="updateProgress" class="update-progress hidden"><div id="updateProgressBar"></div></div>
+ <div id="updateReleaseNotes" class="update-release-notes hidden"></div>
+</section>
+
 <section class="panel live-panel">
  <div class="panel-title">
    <div><h2>Live Loot Monitor</h2><p>Loot tracking runs automatically whenever the companion is ONLINE. Sounds/attention alerts are optional.</p></div>

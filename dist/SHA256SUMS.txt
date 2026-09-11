@@ -1,1 +1,1 @@
-5cd27ece5a59aff81dc60095c287fc8cad4aebd7731847c7b40da93118728cf8  eq_spell_research_assistant_v0.14.0.zip
+7dbbd2959d60dae461eb2ab65bf8a3992ad29897d6a00da821f0593d6cbbc3be  eq_spell_research_assistant_v0.15.0.zip
