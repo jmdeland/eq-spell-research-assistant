@@ -21,6 +21,38 @@ SHA-256 for v0.16.0:
 050f3d21c80d21cc7502b52948d97a8132b4f39adcaf8668332b483a618f41be
 ```
 
+## Screenshots
+
+### Live Loot Monitor
+Real-time loot classification, looter tracking, high-value Research identification, and instant notification when a newly looted component makes a spell craftable.
+
+![Live Loot Monitor](docs/images/RALM1.jpg)
+
+### Inventory & Research Filters
+Load a Bastion Magelo character, summarize Research inventory, see carried/banked/shared quantities, and filter Research by class, level, and skill.
+
+![Inventory and Research Filters](docs/images/RALM2.jpg)
+
+### Spell Planner
+Browse Researchable spells with exact EverQuest spell icons, see readiness at a glance, inspect ingredients, and find exactly where each owned component is stored.
+
+![Spell Planner](docs/images/RALM3.jpg)
+
+### Item Lookup
+Look up an obscure Research component and immediately see its verified spell uses, Research trivial, class information, and Bastion source links.
+
+![Item Lookup](docs/images/RALM4.jpg)
+
+### Session Loot Export
+Export the complete session loot history to CSV, including looter, classification, verified uses, candidate item IDs, ownership status, and tracking mode.
+
+![Session Loot CSV Export](docs/images/RALM5.jpg)
+
+### Settings & Configuration
+Configure themes, live monitoring, loot ownership behavior, sounds and alerts, Bastion data synchronization, and application updates in one workspace.
+
+![Settings and Configuration](docs/images/RALM6.jpg)
+
 ## What it does
 
 The tool watches your EverQuest log in real time and identifies useful Research drops as they happen.
@@ -221,18 +253,6 @@ The app runs locally on your computer.
 Local settings, inventory state, and monitor configuration remain on your PC unless you explicitly export or share them.
 
 The application contacts public Bastion pages for requested Magelo/data synchronization and GitHub Releases for update checks/downloads.
-
-## Screenshots
-
-The recommended screenshot order for posts or documentation is:
-
-1. **Live Loot Monitor** — real-time loot classification and craftable-spell alert
-2. **Spell Planner** — Researchable spell list and selected recipe readiness
-3. **Inventory + Research Filters** — Magelo inventory intelligence
-4. **Item Lookup** — reverse Research-component lookup
-5. **Settings & Configuration** — alerts, monitoring, Bastion data, themes, and updates
-
-> Repository screenshots can be added later under `docs/images/` without changing the application itself.
 
 ## Development Channels
 
