@@ -33,7 +33,7 @@ function Strip-Html([string]$html) {
     return ([regex]::Replace($x,'\s+',' ')).Trim()
 }
 function Invoke-Bastion([string]$url) {
-    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Spell-Research-Assistant/0.15.0"}).Content
+    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Spell-Research-Assistant/0.15.1-demo.5"}).Content
 }
 function Parse-RecipePage([int]$id,[string]$html) {
     $plain=Strip-Html $html
@@ -320,6 +320,32 @@ function Parse-MageloInventory([string]$html,[string]$characterName){
         throw "Bastion inventory payload was found but JSON parsing failed: $($_.Exception.Message)"
     }
 
+    # invSearch identifies each occupied slot, but does not carry the stack quantity.
+    # Bastion renders the actual quantity beside each inventory icon in the page HTML.
+    # Build a per-item-ID queue of rendered stack quantities and pair those occurrences
+    # with the corresponding invSearch rows. If a rendered quantity is absent, the slot
+    # represents one item.
+    $renderedQtyById=@{}
+    $renderedMatches=[regex]::Matches($html,'data-inv-item-id="(?<id>\d+)"','IgnoreCase')
+    for($ri=0;$ri -lt $renderedMatches.Count;$ri++){
+        $rm=$renderedMatches[$ri]
+        $start=$rm.Index
+        $end=$(if($ri+1 -lt $renderedMatches.Count){$renderedMatches[$ri+1].Index}else{[Math]::Min($html.Length,$start+5000)})
+        $len=[Math]::Max(0,$end-$start)
+        $segment=$html.Substring($start,$len)
+        $qm=[regex]::Match($segment,'indicator-item[^>]*>\s*(?<qty>\d+)\s*</span>','Singleline,IgnoreCase')
+        $qty=1
+        if($qm.Success){
+            $parsed=0
+            if([int]::TryParse($qm.Groups['qty'].Value,[ref]$parsed) -and $parsed -gt 0){$qty=$parsed}
+        }
+        $id=[int]$rm.Groups['id'].Value
+        $key=[string]$id
+        if(-not $renderedQtyById.ContainsKey($key)){$renderedQtyById[$key]=New-Object System.Collections.ArrayList}
+        [void]$renderedQtyById[$key].Add($qty)
+    }
+    $renderedQtyIndex=@{}
+
     $items=New-Object System.Collections.ArrayList
 
     foreach($x in @($rawItems)){
@@ -333,21 +359,58 @@ function Parse-MageloInventory([string]$html,[string]$characterName){
             default        {"Inventory"}
         }
 
+        $bagSlot=$x.bagSlot
+        $containerNumber=$null
+        $locationLabel=$location
+        if($loc -eq "bag" -and $null -ne $bagSlot){
+            $slotNumber=[int]$bagSlot
+            if($slotNumber -ge 22 -and $slotNumber -le 31){
+                $containerNumber=$slotNumber-21
+                $locationLabel="Inventory Bag $containerNumber"
+            }else{
+                $locationLabel="Inventory bag slot $slotNumber"
+            }
+        }elseif($loc -eq "bank" -and $null -ne $bagSlot){
+            $slotNumber=[int]$bagSlot
+            if($slotNumber -ge 2000 -and $slotNumber -le 2099){
+                $containerNumber=$slotNumber-1999
+                $locationLabel="Bank Bag $containerNumber"
+            }else{
+                $locationLabel="Bank bag slot $slotNumber"
+            }
+        }elseif($loc -eq "sharedbank" -and $null -ne $bagSlot){
+            $locationLabel="Shared Bank Bag $bagSlot"
+        }elseif($loc -eq "gear"){
+            $locationLabel="Equipped"
+        }
+
+        $itemId=[int]$x.id
+        $idKey=[string]$itemId
+        $quantity=1
+        if($renderedQtyById.ContainsKey($idKey)){
+            $qi=$(if($renderedQtyIndex.ContainsKey($idKey)){[int]$renderedQtyIndex[$idKey]}else{0})
+            $qList=$renderedQtyById[$idKey]
+            if($qi -lt $qList.Count){$quantity=[int]$qList[$qi]}
+            $renderedQtyIndex[$idKey]=$qi+1
+        }
+
         [void]$items.Add([pscustomobject]@{
             source="Magelo"
             character=$characterName
             location=$location
+            locationLabel=$locationLabel
+            containerNumber=$containerNumber
             rawLocation=$loc
             name=[string]$x.name
-            id=[int]$x.id
-            count=1
-            bagSlot=$x.bagSlot
+            id=$itemId
+            count=$quantity
+            bagSlot=$bagSlot
             parentId=$x.parentId
         })
     }
 
-    # Bastion emits one row per actual item instance/slot.
-    # Aggregate exact item IDs within each location to get quantity.
+    # Bastion emits one invSearch row per occupied slot. The rendered inventory card
+    # supplies the stack quantity for that slot. Aggregate exact item IDs by location.
     $agg=@{}
     foreach($item in $items){
         $key="$($item.location)|$($item.id)"
@@ -361,7 +424,7 @@ function Parse-MageloInventory([string]$html,[string]$characterName){
                 count=0
             }
         }
-        $agg[$key].count++
+        $agg[$key].count += [int]$item.count
     }
 
     return [pscustomobject]@{
@@ -369,6 +432,7 @@ function Parse-MageloInventory([string]$html,[string]$characterName){
         url="https://characters.bastiongame.com/character/$characterName"
         bankHidden=$bankHidden
         items=@($agg.Values)
+        placements=@($items)
         counts=[pscustomobject]@{
             inventory=@($agg.Values|Where-Object{$_.location -eq "Inventory"}).Count
             bank=@($agg.Values|Where-Object{$_.location -eq "Bank"}).Count
@@ -396,7 +460,7 @@ function Get-AppVersionInfo {
     if(Test-Path -LiteralPath $versionPath){
         try{return (Get-Content -LiteralPath $versionPath -Raw | ConvertFrom-Json)}catch{}
     }
-    return [pscustomobject]@{version="0.15.0";channel="stable"}
+    return [pscustomobject]@{version="0.16.0";channel="stable"}
 }
 function Convert-VersionCore([string]$version){
     $clean=($version -replace '^v','').Split('-')[0]
@@ -405,7 +469,7 @@ function Convert-VersionCore([string]$version){
     return [version]("{0}.{1}.{2}" -f $parts[0],$parts[1],$parts[2])
 }
 function Get-LatestGitHubRelease {
-    $headers=@{"User-Agent"="EQ-Spell-Research-Assistant/0.15.0";"Accept"="application/vnd.github+json"}
+    $headers=@{"User-Agent"="EQ-Spell-Research-Assistant/0.15.1-demo.5";"Accept"="application/vnd.github+json"}
     return Invoke-RestMethod -UseBasicParsing -Uri $updateApi -TimeoutSec 45 -Headers $headers
 }
 function Get-UpdateInfo {
@@ -445,7 +509,7 @@ function Download-AndVerifyLatestUpdate {
     $dest=Join-Path $updateStage $info.assetName
     $tmp=$dest+".download"
     if(Test-Path -LiteralPath $tmp){Remove-Item -LiteralPath $tmp -Force}
-    $headers=@{"User-Agent"="EQ-Spell-Research-Assistant/0.15.0"}
+    $headers=@{"User-Agent"="EQ-Spell-Research-Assistant/0.15.1-demo.5"}
     try{
         Invoke-WebRequest -UseBasicParsing -Uri $info.assetUrl -OutFile $tmp -TimeoutSec 120 -Headers $headers
         $actual=(Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -612,7 +676,7 @@ try {
 
 $shutdownForUpdate=$false
 $listener=New-Object Net.HttpListener;$prefix="http://127.0.0.1:$port/";$listener.Prefixes.Add($prefix);$listener.Start()
-Write-Host "";Write-Host "EverQuest Spell Research Assistant v0.15.0";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
+Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.15.1-demo.13";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
 Start-Process ($prefix + "index.html")
 
 try{

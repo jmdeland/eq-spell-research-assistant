@@ -1,43 +1,60 @@
-# EverQuest Spell Research Assistant
+# EverQuest Research & Loot Tool by Bromm
 
-Version **0.15.0**
+Version **0.16.0**
 
-A local browser + PowerShell companion for Bastion Research recipe planning, Magelo inventory loading, reverse Research-item lookup, live EverQuest loot monitoring, and verified self-updates through GitHub Releases.
+A local Windows companion for Bastion spell Research planning, Magelo inventory mapping, and live EverQuest loot monitoring.
 
-## v0.15.0 production changes
+## Highlights
 
-- Promotes the Windows-tested updater from the demo branch into stable production.
-- Checks the latest stable GitHub release from inside the app.
-- Downloads the release ZIP through the local companion.
-- Verifies the GitHub-provided SHA-256 digest before installation.
-- Creates a full timestamped backup before replacing the application folder.
-- Preserves `monitor-config.json` across updates.
-- Restarts automatically after successful installation.
-- Restores the backup if replacement fails.
-- Reports the previous update result and available rollback backups.
-- Retains the two newest backups for the current install path.
+- Live Loot Monitor is the primary workspace, with looter names and Research-value classification.
+- Bastion Magelo inventory loading with verified stack quantities and bag/bank location mapping.
+- Exact default ROF2/Bastion spell icons mapped from the supplied client `spells_us.txt` and default icon sheets.
+- Research recipe readiness, ingredient locations, reverse item lookup, and partial-name autocomplete.
+- Autocomplete supports **Up/Down**, **Tab**, **Enter**, and **Esc** and is optimized for responsive typing.
+- Settings workspace for appearance, monitoring, alerts, Bastion data, and application updates.
+- Selectable **Default**, **EQBlue**, **EQGold**, and **EQRed** appearances.
+- GitHub self-updater with SHA-256 verification, full-folder backup, config preservation, rollback protection, and restart.
+- Friend-friendly hidden launcher, Windows tray controls, desktop shortcut installer, and guarded Exit warning.
 
-All v0.14.0 production features remain included: Bastion Magelo inventory, spell class/level metadata sync, Research readiness, live loot ownership modes, Magelo reconciliation, session loot CSV export, alerts, and reverse item lookup.
+## Recommended installation for friends
 
-## Start
+1. Download the ZIP only from the official GitHub Release page.
+2. Extract the entire ZIP to a permanent folder. Do not run the application from inside the ZIP.
+3. Run `INSTALL-DESKTOP-SHORTCUT.bat` once.
+4. Launch **EverQuest Research & Loot Tool** from the desktop shortcut.
+5. On first launch, choose the active EverQuest `eqlog_*.txt` file when prompted.
+6. Leave the tray companion running while playing EverQuest.
 
-Run `START-LIVE-MONITOR.bat`. On first run, choose the active `eqlog_*.txt` file. The app opens at `http://127.0.0.1:8765/`.
+### Windows security warning
+
+This hobby project is not code-signed. Windows may show an **Unknown publisher** or Microsoft Defender SmartScreen warning. Only proceed when the files were downloaded from the official GitHub Release for this project.
+
+The older `START-LIVE-MONITOR.bat` remains available for troubleshooting. Normal users should use `START-RESEARCH-TOOL.bat` or the desktop shortcut.
+
+## Search shortcuts
+
+Autocomplete is available in Quick Loot Lookup, Item Lookup, and Researchable Spells. Type a partial name such as `Rune of Z`, then use:
+
+- **Down / Up** — move through suggestions
+- **Tab** — complete the highlighted or first suggestion
+- **Enter** — select / run the relevant action
+- **Esc** — dismiss suggestions
+
+Exact item IDs still work.
+
+## Inventory accuracy
+
+Bastion Magelo is the preferred inventory source. The parser preserves exact item IDs, rendered stack quantities, and verified inventory/bank bag placement. Live-loot quantities can count provisionally in Group / Personal mode until a Magelo refresh confirms them.
 
 ## Updating
 
-Use **Application Updates → Check for Updates**. When a newer stable GitHub release exists, the app can download, SHA-256 verify, back up the current installation, install the release, preserve local monitor configuration, and restart automatically.
-
-## Inventory
-
-Magelo is the preferred inventory source. Enter a Bastion character name or full character URL and choose **Load / Refresh Magelo**.
-
-The optional **Use Inventory Output File Instead** button accepts tab/comma-delimited inventory output containing `Name`, `ID`, and `Count` columns.
+Settings → **Application Updates** checks the latest stable GitHub Release. Updating is optional; older installed releases do not expire just because a newer version exists.
 
 ## Privacy
 
-The app runs locally. Local settings and inventory state stay on the computer unless the user explicitly exports or shares files. Bastion sync actions request public Bastion Library/character pages.
+The app runs locally. Inventory state and local settings remain on the computer unless the user explicitly exports or shares them. Public Bastion pages and GitHub Releases are contacted only for their relevant sync/update functions.
 
-## Development lines
+## Development channels
 
-- `main`: stable production
-- `demo`: experimental features and UI work
+- `main` — stable production
+- `demo` — experimental/testing builds

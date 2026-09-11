@@ -9,7 +9,7 @@ function apiUrl(path){
  return onCompanion?path:`${LIVE_COMPANION_ORIGIN}${path}`;
 }
 
-let ACTIVE_DATA=BASTION_DATA,inventory=[],aggregated=[],inventorySources=[],mageloInventory=[],mageloMeta=null,recipeResults=[],selectedKey=null,liveLootCounts=new Map(),liveOwnedCounts=new Map(),sessionLootEvents=[],previousMageloCounts=null,liveLootFeed=[],liveLastEventId=0,liveEnabled=true,liveAudioCtx=null,liveMonitorOnline=false,corpusSyncInProgress=false,livePollInFlight=false,processedLiveEventIds=new Set();
+let ACTIVE_DATA=BASTION_DATA,inventory=[],aggregated=[],inventorySources=[],mageloInventory=[],mageloPlacements=[],mageloMeta=null,recipeResults=[],selectedKey=null,liveLootCounts=new Map(),liveOwnedCounts=new Map(),sessionLootEvents=[],previousMageloCounts=null,liveLootFeed=[],liveLastEventId=0,liveEnabled=true,liveAudioCtx=null,liveMonitorOnline=false,corpusSyncInProgress=false,livePollInFlight=false,processedLiveEventIds=new Set();
 const $=s=>document.querySelector(s),norm=s=>(s||"").toLowerCase().replace(/[’']/g,"`").replace(/\s+/g," ").trim();
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 function canonical(s){let n=norm(s);if(n.startsWith("spell: "))n=n.slice(7);return(ACTIVE_DATA.aliases||{})[n]||n}
@@ -71,7 +71,7 @@ function filenameCharacter(n){return n.replace(/\.(txt|tsv|csv)$/i,"").replace(/
 function rkey(r){return r.recipeKey||((r.recipeId!=null)?`bastion:${r.recipeId}`:`${r.class||"ALL"}:${r.spell}:${r.trivial??"?"}`)}
 function parseInventory(text,source){const lines=text.replace(/\r/g,"").split("\n").filter(x=>x.trim());if(!lines.length)throw Error("Empty file.");const d=lines[0].includes("\t")?"\t":",",h=lines[0].split(d).map(x=>x.trim().toLowerCase()),i=k=>h.indexOf(k);if(i("name")<0||i("id")<0||i("count")<0)throw Error("Could not find Name, ID and Count columns.");return lines.slice(1).map(l=>{const c=l.split(d);return{source,name:(c[i("name")]||"").trim(),id:Number(c[i("id")]||0),count:Number(c[i("count")]||0)}}).filter(x=>x.name&&x.name!=="Empty"&&x.id&&x.count>0)}
 function aggregate(items){const m=new Map();for(const x of items){const k=`id:${x.id}`;if(!m.has(k))m.set(k,{name:x.name,id:x.id,count:0});m.get(k).count+=x.count}return[...m.values()]}
-function rebuildAggregated(){aggregated=aggregate([...inventory,...mageloInventory]);}
+function rebuildAggregated(){aggregated=aggregate([...inventory,...mageloInventory]);invalidateAutocomplete("items")}
 function vendor(c){return $("#vendorBasics").checked&&c.vendorBasic}
 function knownIdsForName(name){
  const ids=new Set();
@@ -128,16 +128,64 @@ function count(c){
  const t=canonical(c.name);
  return aggregated.filter(x=>canonical(x.name)===t).reduce((a,x)=>a+x.count,0)+liveCountForComponent(c);
 }
-function evaluate(){recipeResults=(ACTIVE_DATA.recipes||[]).filter(r=>r.complete!==false).map(raw=>{const r=enrichSpellMetadata(raw);const comps=(r.components||[]).map(x=>{const c=typeof x==="string"?{name:x}:x,need=c.count||1,have=count(c),assumed=vendor(c);return{...c,need,have,assumed,ok:assumed||have>=need}}),missing=comps.filter(c=>!c.ok);return{...r,_key:rkey(r),comps,missingCount:missing.length,maxCombines:missing.length?0:Math.min(...comps.filter(c=>!c.assumed).map(c=>Math.floor(c.have/c.need)).concat([999]))}})}
+function evaluate(){invalidateAutocomplete("spells");recipeResults=(ACTIVE_DATA.recipes||[]).filter(r=>r.complete!==false).map(raw=>{const r=enrichSpellMetadata(raw);const comps=(r.components||[]).map(x=>{const c=typeof x==="string"?{name:x}:x,need=c.count||1,have=count(c),assumed=vendor(c);return{...c,need,have,assumed,ok:assumed||have>=need}}),missing=comps.filter(c=>!c.ok);return{...r,_key:rkey(r),comps,missingCount:missing.length,maxCombines:missing.length?0:Math.min(...comps.filter(c=>!c.assumed).map(c=>Math.floor(c.have/c.need)).concat([999]))}})}
 function status(r){return r.missingCount===0?"READY":r.missingCount===1?"ONE_SHORT":r.missingCount===2?"TWO_SHORT":"MISSING"}
 function statusText(r){return r.missingCount===0?`READY${r.maxCombines<999?` ×${r.maxCombines}`:""}`:`MISSING ${r.missingCount}`}
 function catalogPendingRows(){if(ACTIVE_DATA!==BASTION_DATA)return[];const mapped=new Set(recipeResults.map(r=>norm(r.spell)));return(SPELL_CATALOG.spells||[]).filter(s=>s.researchStatus==="CONFIRMED_UNRESOLVED"&&(s.acquisition||[]).includes("Research")&&!mapped.has(norm(s.name))).map(s=>({_pending:true,_key:`pending:${norm(s.name)}`,spell:s.name,class:(s.classes||[]).length===1?s.classes[0]:"UNKNOWN",classes:s.classes||[],level:s.levelByClass&&Object.values(s.levelByClass)[0]||null,levelByClass:s.levelByClass||{},researchEvidence:s.researchEvidence||[],notes:s.notes||"",bastionUrl:s.bastionUrl||null}))}
 function classMatches(r,cls){if(cls==="ALL")return true;if((r.classes||[]).includes(cls))return true;return r.class===cls}
 function rows(){const cls=$("#classFilter").value,st=$("#statusFilter").value,q=norm($("#spellSearch").value),lvl=Number($("#characterLevel").value||0),order={READY:0,ONE_SHORT:1,TWO_SHORT:2,MISSING:3,PENDING:4};let a=[...recipeResults,...catalogPendingRows()].filter(r=>classMatches(r,cls)&&(!lvl||!r.level||r.level<=lvl));if(st!=="ALL")a=a.filter(r=>(r._pending?"PENDING":status(r))===st);if(q)a=a.filter(r=>norm(r.spell).includes(q));return a.sort((x,y)=>order[x._pending?"PENDING":status(x)]-order[y._pending?"PENDING":status(y)]||(x.level||999)-(y.level||999)||x.spell.localeCompare(y.spell)||(x.recipeId||0)-(y.recipeId||0))}
 function skill(r){const s=Number($("#researchSkill").value||0);return !s||r.trivial==null?"":s>=r.trivial?" • trivial to you":` • ${r.trivial-s} skill to trivial`}
+const DEFAULT_SPELL_ICONS=window.EQ_DEFAULT_SPELL_ICONS||{};
+function spellIconKey(name){return String(name||"").toLowerCase().replace(/[’`']/g,"'").replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ")}
+function spellIconInfo(name){return DEFAULT_SPELL_ICONS[spellIconKey(name)]||null}
+function spellIconHtml(r,extraClass=""){
+ const name=typeof r==="string"?r:(r?.spell||r?.name||"");
+ const info=spellIconInfo(name);
+ if(!info)return `<span class="skin-spell-icon spell-icon-fallback ${extraClass}" title="Default icon unavailable">✦</span>`;
+ return `<img class="skin-spell-icon ${extraClass}" src="${esc(info.asset)}" alt="${esc(name)} spell icon" title="${esc(info.clientName||name)} • default client icon #${info.newIcon}" loading="lazy"/>`;
+}
+function spellNameWithIcon(name,extra=""){return `<span class="spell-name-inline">${spellIconHtml(name,"inline-spell-icon")}<span>${esc(name)}${extra}</span></span>`}
 function renderSummary(){const a=rows();$("#sumReady").textContent=a.filter(r=>!r._pending&&r.missingCount===0).length;$("#sumOne").textContent=a.filter(r=>!r._pending&&r.missingCount===1).length;$("#sumPending").textContent=a.filter(r=>r._pending).length;$("#sumShown").textContent=a.length}
-function renderList(){const a=rows();$("#spellList").innerHTML=a.length?a.map(r=>{if(r._pending)return`<div class="spell-row pending-row ${selectedKey===r._key?"selected":""}" data-key="${esc(r._key)}"><div><div class="spell-name">${esc(r.spell)}</div><div class="spell-meta">${r.class||"ALL"}${r.level?` • Level ${r.level}`:""} • Bastion Research confirmed</div></div><span class="status-pill pending">RECIPE PENDING</span></div>`;const st=status(r),css=st==="READY"?"ready":st==="ONE_SHORT"?"one":st==="TWO_SHORT"?"two":"missing";return`<div class="spell-row ${css} ${selectedKey===r._key?"selected":""}" data-key="${esc(r._key)}"><div><div class="spell-name">${esc(r.spell)}${r.recipeId?` <small>#${r.recipeId}</small>`:""}</div><div class="spell-meta">${spellUsageLabel(r)} • Research ${r.trivial??"?"}${skill(r)}</div></div><span class="status-pill ${css}">${statusText(r)}</span></div>`}).join(""):'<div class="detail-empty"><p>No Research spells match these filters.</p></div>';document.querySelectorAll(".spell-row").forEach(e=>e.onclick=()=>{selectedKey=e.dataset.key;renderList();renderDetail()})}
-function renderDetail(){const pending=catalogPendingRows().find(x=>x._key===selectedKey);if(pending){$("#spellDetail").innerHTML=`<div class="detail-head"><h2>${esc(pending.spell)}</h2><p>${spellUsageLabel(pending)} • Bastion Research confirmed</p></div><div class="pending-box"><h3>Exact recipe still awaiting verification</h3><p>This spell is no longer hidden. Bastion evidence confirms it is researchable, but the app will not invent missing ingredients or a trivial.</p></div>${pending.notes?`<div class="recipe-info">${esc(pending.notes)}</div>`:""}${pending.researchEvidence.length?`<div class="recipe-info"><strong>Verified research evidence</strong>${pending.researchEvidence.map(e=>`<div class="evidence-line">${e.itemId?`Item #${e.itemId} — `:""}${esc(e.itemName||e.label||"Bastion source")}${e.url?` — <a href="${esc(e.url)}" target="_blank">open source ↗</a>`:""}</div>`).join("")}</div>`:""}`;return}const r=recipeResults.find(x=>x._key===selectedKey);if(!r){$("#spellDetail").innerHTML='<div class="detail-empty"><h2>Select a spell</h2><p>Choose a spell to see what you have and what you need.</p></div>';return}const miss=r.comps.filter(c=>!c.ok);$("#spellDetail").innerHTML=`<div class="detail-head"><h2>${esc(r.spell)}</h2><p>${spellUsageLabel(r)} • Research trivial ${r.trivial??"?"}${r.recipeId?` • Bastion recipe #${r.recipeId}`:""}</p></div><table class="ingredient-table"><thead><tr><th>Ingredient</th><th>Need</th><th>You have</th><th>Status</th></tr></thead><tbody>${r.comps.map(c=>`<tr><td>${esc(c.name)}${c.id?` <small>#${c.id}</small>`:""}</td><td>${c.need}</td><td class="${c.assumed?"vendor":c.ok?"have":"need"}">${c.assumed?"Vendor":c.have}</td><td class="${c.ok?"have":"need"}">${c.assumed?"◎ assumed available":c.ok?"✓ have":"✕ missing"}</td></tr>`).join("")}</tbody></table>${miss.length?`<div class="missing-box"><h3>You still need</h3>${miss.map(c=>`<div>${Math.max(c.need-c.have,1)} × ${esc(c.name)}${c.id?` <small>#${c.id}</small>`:""}</div>`).join("")}</div>`:`<div class="ready-box"><h3>You can make this now.</h3><p>${r.maxCombines<999?`Current inventory supports ${r.maxCombines} combine(s).`:"Vendor-only basics assumed."}</p></div>`}<div class="recipe-info">${r.containers?.length?`Containers: ${esc(r.containers.join(", "))}<br>`:""}${r.sourceUrl?`<a href="${esc(r.sourceUrl)}" target="_blank">Open Bastion recipe ↗</a>`:""}</div>`}
+function renderList(){
+ const a=rows();
+ $("#spellList").innerHTML=a.length?a.map(r=>{
+  const icon=spellIconHtml(r);
+  if(r._pending)return `<div class="spell-row pending-row ${selectedKey===r._key?"selected":""}" data-key="${esc(r._key)}">${icon}<div class="spell-row-copy"><div class="spell-name">${esc(r.spell)}</div><div class="spell-meta">${r.class||"ALL"}${r.level?` • Level ${r.level}`:""} • Bastion Research confirmed</div></div><span class="status-pill pending">RECIPE PENDING</span></div>`;
+  const st=status(r),css=st==="READY"?"ready":st==="ONE_SHORT"?"one":st==="TWO_SHORT"?"two":"missing";
+  return `<div class="spell-row ${css} ${selectedKey===r._key?"selected":""}" data-key="${esc(r._key)}">${icon}<div class="spell-row-copy"><div class="spell-name">${esc(r.spell)}${r.recipeId?` <small>#${r.recipeId}</small>`:""}</div><div class="spell-meta">${spellUsageLabel(r)} • Research ${r.trivial??"?"}${skill(r)}</div></div><span class="status-pill ${css}">${statusText(r)}</span></div>`;
+ }).join(""):'<div class="detail-empty"><p>No Research spells match these filters.</p></div>';
+ document.querySelectorAll(".spell-row").forEach(e=>e.onclick=()=>{selectedKey=e.dataset.key;renderList();renderDetail()})
+}
+
+function mageloPlacementMatchesComponent(p,c){
+ if(!p||!c)return false;
+ if(c.id)return Number(p.id)===Number(c.id);
+ const target=canonical(c.name),ids=knownIdsForName(c.name);
+ if(ids.length>1)return false;
+ return canonical(p.name)===target;
+}
+function placementLabel(p){
+ if(!p)return "";
+ if(p.locationLabel)return p.locationLabel;
+ if(p.location==="Gear")return "Equipped";
+ return p.location||"Inventory";
+}
+function componentLocationInfo(c){
+ if(c.assumed)return {short:"Vendor",all:["Vendor"]};
+ const matches=mageloPlacements.filter(p=>mageloPlacementMatchesComponent(p,c));
+ const labels=[...new Set(matches.map(placementLabel).filter(Boolean))];
+ const provisional=liveCountForComponent(c)>0;
+ if(!labels.length&&provisional)return {short:"Live loot",all:["Live loot — pending Magelo refresh"]};
+ if(!labels.length)return {short:"—",all:[]};
+ const short=labels.length===1?labels[0]:`${labels[0]} +${labels.length-1}`;
+ return {short,all:labels};
+}
+function componentLocationHtml(c){
+ const info=componentLocationInfo(c);
+ const title=info.all.length?` title="${esc(info.all.join(" • "))}"`:"";
+ return `<span class="ingredient-location"${title}>${esc(info.short)}</span>`;
+}
+function renderDetail(){const pending=catalogPendingRows().find(x=>x._key===selectedKey);if(pending){$("#spellDetail").innerHTML=`<div class="detail-head eqred-detail-head">${spellIconHtml(pending)}<div><h2>${esc(pending.spell)}</h2><p>${spellUsageLabel(pending)} • Bastion Research confirmed</p></div></div><div class="pending-box"><h3>Exact recipe still awaiting verification</h3><p>This spell is no longer hidden. Bastion evidence confirms it is researchable, but the app will not invent missing ingredients or a trivial.</p></div>${pending.notes?`<div class="recipe-info">${esc(pending.notes)}</div>`:""}${pending.researchEvidence.length?`<div class="recipe-info"><strong>Verified research evidence</strong>${pending.researchEvidence.map(e=>`<div class="evidence-line">${e.itemId?`Item #${e.itemId} — `:""}${esc(e.itemName||e.label||"Bastion source")}${e.url?` — <a href="${esc(e.url)}" target="_blank">open source ↗</a>`:""}</div>`).join("")}</div>`:""}`;return}const r=recipeResults.find(x=>x._key===selectedKey);if(!r){$("#spellDetail").innerHTML='<div class="detail-empty"><h2>Select a spell</h2><p>Choose a spell to see what you have and what you need.</p></div>';return}const miss=r.comps.filter(c=>!c.ok);$("#spellDetail").innerHTML=`<div class="detail-head eqred-detail-head">${spellIconHtml(r)}<div><h2>${esc(r.spell)}</h2><p>${spellUsageLabel(r)} • Research trivial ${r.trivial??"?"}${r.recipeId?` • Bastion recipe #${r.recipeId}`:""}</p></div></div><table class="ingredient-table"><thead><tr><th>Ingredient</th><th>Need</th><th>You have</th><th>Where</th><th>Status</th></tr></thead><tbody>${r.comps.map(c=>`<tr><td>${esc(c.name)}${c.id?` <small>#${c.id}</small>`:""}</td><td>${c.need}</td><td class="${c.assumed?"vendor":c.ok?"have":"need"}">${c.assumed?"Vendor":c.have}</td><td>${componentLocationHtml(c)}</td><td class="${c.ok?"have":"need"}">${c.assumed?"◎ assumed available":c.ok?"✓ have":"✕ missing"}</td></tr>`).join("")}</tbody></table>${miss.length?`<div class="missing-box"><h3>You still need</h3>${miss.map(c=>`<div>${Math.max(c.need-c.have,1)} × ${esc(c.name)}${c.id?` <small>#${c.id}</small>`:""}</div>`).join("")}</div>`:`<div class="ready-box"><h3>You can make this now.</h3><p>${r.maxCombines<999?`Current inventory supports ${r.maxCombines} combine(s).`:"Vendor-only basics assumed."}</p></div>`}<div class="recipe-info">${r.containers?.length?`Containers: ${esc(r.containers.join(", "))}<br>`:""}${r.sourceUrl?`<a href="${esc(r.sourceUrl)}" target="_blank">Open Bastion recipe ↗</a>`:""}</div>`}
 
 function evaluateLevelingRecipe(r){
  const comps=(r.components||[]).map(x=>{const c=typeof x==="string"?{name:x}:x,need=c.count||1,have=count(c),assumed=vendor(c);return{...c,need,have,assumed,ok:assumed||have>=need}});
@@ -181,7 +229,7 @@ function renderLeveling(){
  if(target<=cur){$("#levelingSummary").textContent="Target must be higher than current Research skill.";$("#levelingList").innerHTML="";return}
  const a=levelingCandidates();
  $("#levelingSummary").textContent=a.length?`Showing ${Math.min(a.length,16)} verified leveling candidates from skill ${cur} toward ${target}. Subcombines are included when verified. Scoring is a planning heuristic, not an official skill-up probability formula.`:`No verified recipe candidates were found in this range. Try a higher target or turn off Selected class only.`;
- $("#levelingList").innerHTML=a.slice(0,16).map((x,i)=>`<div class="level-card ${i===0?"best":""}"><div class="level-head"><strong>${i===0?"★ ":""}${esc(x.r.spell)}</strong><span class="level-score">Trivial ${x.r.trivial}</span></div><div class="level-meta">${x.r.isSubcombine?"Research subcombine":(x.r.class||"ALL")} • ${x.delta} points above current • ${x.available&&x.available<999?`${x.available} combine(s) available`:x.available>=999?"vendor-only/assumed available":`missing ${x.r.missingCount} component type(s)`}</div><div class="level-reason">${x.available?`You can attempt this now with your current inventory/settings.`:`Not craftable now, but useful as a near-term skill-up target.`}</div>${x.valuable.length?`<div class="level-warn">Conserve if possible: ${esc(x.valuable.join(", "))}</div>`:""}${x.r.sourceUrl?`<div class="recipe-info"><a href="${esc(x.r.sourceUrl)}" target="_blank">Open verified recipe ↗</a></div>`:""}</div>`).join("");
+ $("#levelingList").innerHTML=a.slice(0,16).map((x,i)=>`<div class="level-card ${i===0?"best":""}"><div class="level-head"><strong>${i===0?"★ ":""}${x.r.isSubcombine?esc(x.r.spell):spellNameWithIcon(x.r.spell)}</strong><span class="level-score">Trivial ${x.r.trivial}</span></div><div class="level-meta">${x.r.isSubcombine?"Research subcombine":(x.r.class||"ALL")} • ${x.delta} points above current • ${x.available&&x.available<999?`${x.available} combine(s) available`:x.available>=999?"vendor-only/assumed available":`missing ${x.r.missingCount} component type(s)`}</div><div class="level-reason">${x.available?`You can attempt this now with your current inventory/settings.`:`Not craftable now, but useful as a near-term skill-up target.`}</div>${x.valuable.length?`<div class="level-warn">Conserve if possible: ${esc(x.valuable.join(", "))}</div>`:""}${x.r.sourceUrl?`<div class="recipe-info"><a href="${esc(x.r.sourceUrl)}" target="_blank">Open verified recipe ↗</a></div>`:""}</div>`).join("");
 }
 
 
@@ -226,12 +274,24 @@ function knownItemByName(q){
  for(const e of Object.values(ACTIVE_DATA.nameEvidence||{}))if(norm(e.name)===norm(q))matches.push({id:null,name:e.name});
  const out=[];for(const m of matches)if(!out.some(x=>x.id===m.id&&norm(x.name)===norm(m.name)))out.push(m);return out;
 }
+function allKnownItemChoices(){
+ const m=new Map();
+ const add=(name,id=null)=>{if(!name)return;const key=`${norm(name)}|${id??""}`;if(!m.has(key))m.set(key,{name,id:id!=null?Number(id):null});};
+ for(const a of aggregated)add(a.name,a.id);
+ for(const r of allReverseRecipes())for(const c of (r.comps||[]))add(c.name,c.id||null);
+ for(const [id,e] of Object.entries(ACTIVE_DATA.ownedComponentEvidence||{}))add(e.name,Number(id));
+ for(const e of Object.values(ACTIVE_DATA.nameEvidence||{}))add(e.name,null);
+ return [...m.values()];
+}
 function reverseLookupItems(){
  const q=$("#reverseSearch")?.value.trim()||"";if(!q)return[];
  if(/^\d+$/.test(q)){const id=Number(q),a=aggregated.find(x=>x.id===id);if(a)return[a];const ev=(ACTIVE_DATA.ownedComponentEvidence||{})[String(id)];return ev?[{id,name:ev.name,count:0}]:[{id,name:"Unknown item",count:0}]}
- const inv=aggregated.filter(x=>norm(x.name)===norm(q));if(inv.length)return inv;
- const known=knownItemByName(q);if(known.length)return known.map(x=>({...x,count:x.id?(aggregated.find(a=>a.id===x.id)?.count||0):0}));
- return[{id:null,name:q,count:0}];
+ const nq=norm(q);
+ const exactInv=aggregated.filter(x=>norm(x.name)===nq);if(exactInv.length)return exactInv;
+ const exactKnown=knownItemByName(q);if(exactKnown.length)return exactKnown.map(x=>({...x,count:x.id?(aggregated.find(a=>a.id===x.id)?.count||0):0}));
+ const choices=allKnownItemChoices().filter(x=>norm(x.name).includes(nq));
+ const unique=[];for(const x of choices){if(!unique.some(y=>y.id===x.id&&norm(y.name)===norm(x.name)))unique.push({...x,count:x.id?(aggregated.find(a=>a.id===x.id)?.count||0):0});}
+ return unique.slice(0,50);
 }
 function renderReverseLookup(){
  const out=$("#reverseResults"),sum=$("#reverseSummary"),items=reverseLookupItems();if(!out||!sum)return;
@@ -241,15 +301,70 @@ function renderReverseLookup(){
   let uses=reverseUsesForItem(item);if(cls!=="ALL")uses=uses.filter(r=>r._isSubcombine||r._evidenceOnly||classMatches(r,cls));if(st==="READY")uses=uses.filter(r=>r.canMake);if(st==="ONE_SHORT")uses=uses.filter(r=>r.otherMissing===1);
   uses.sort((a,b)=>(a._evidenceOnly?1:0)-(b._evidenceOnly?1:0)||((a.otherMissing??99)-(b.otherMissing??99))||(a.spell||"").localeCompare(b.spell||""));total+=uses.length;const value=reverseValueLabel(uses.length);
   blocks.push(`<div class="reverse-item-header"><strong>${esc(item.name)}</strong>${item.id?` <small>#${item.id}</small>`:""}${item.count?` <small>×${item.count} owned</small>`:""}<div class="${value.cls}" style="margin-top:4px">${value.text}</div></div>`+
-  (uses.length?uses.map(r=>`<div class="reverse-card ${r._evidenceOnly?"evidence-only":""}"><h3><span class="use-type ${r._isSubcombine?"subcombine":""}">${r._isSubcombine?"SUBCOMBINE":"SPELL"}</span>${esc(r.spell)}${r.recipeId?` <small>#${r.recipeId}</small>`:""}</h3><div class="reverse-card-meta">${r.trivial!=null?`Research ${r.trivial}`:"Bastion item-use evidence"}${!r._isSubcombine&&((r.classes||[]).length||r.class)?` • ${(r.classes||[]).length?r.classes.join(", "):(r.class||"ALL")}`:""}</div><div class="recipe-info">${r.sourceUrl?`<a href="${esc(r.sourceUrl)}" target="_blank">Open Bastion source ↗</a>`:""}</div></div>`).join(""):`<div class="reverse-card"><p>No verified Research use is currently indexed for this exact item. This is a coverage gap, not proof the item is useless.</p></div>`));
+  (uses.length?uses.map(r=>`<div class="reverse-card ${r._evidenceOnly?"evidence-only":""}"><h3><span class="use-type ${r._isSubcombine?"subcombine":""}">${r._isSubcombine?"SUBCOMBINE":"SPELL"}</span>${spellNameWithIcon(r.spell,r.recipeId?` <small>#${r.recipeId}</small>`:"")}</h3><div class="reverse-card-meta">${r.trivial!=null?`Research ${r.trivial}`:"Bastion item-use evidence"}${!r._isSubcombine&&((r.classes||[]).length||r.class)?` • ${(r.classes||[]).length?r.classes.join(", "):(r.class||"ALL")}`:""}</div><div class="recipe-info">${r.sourceUrl?`<a href="${esc(r.sourceUrl)}" target="_blank">Open Bastion source ↗</a>`:""}</div></div>`).join(""):`<div class="reverse-card"><p>No verified Research use is currently indexed for this exact item. This is a coverage gap, not proof the item is useless.</p></div>`));
  }
  sum.textContent=`${items.length>1?`${items.length} exact item IDs share this name • `:""}${total} verified Research use(s) shown.`;out.innerHTML=blocks.join("");
 }
 function runQuickLookup(){
  const q=$("#quickLootSearch").value.trim();if(!q){$("#quickLootResult").textContent="Type an item name or ID.";return}
  $("#reverseSearch").value=q;renderReverseLookup();const items=reverseLookupItems(),uses=items.flatMap(reverseUsesForItem);
- $("#quickLootResult").textContent=uses.length?`${items.length>1?`${items.length} same-name IDs • `:""}${uses.length} verified Research use(s). Full results shown below.`:"No indexed use yet — full results below indicate a coverage gap.";
+ $("#quickLootResult").textContent=uses.length?`${items.length>1?`${items.length} matching item IDs • `:""}${uses.length} verified Research use(s). Full results shown below.`:"No indexed use yet — full results below indicate a coverage gap.";
  document.querySelector("#reverseResults").scrollIntoView({behavior:"smooth",block:"start"});
+}
+const autocompleteCache={items:null,spells:null};
+function invalidateAutocomplete(kind){
+ if(!kind||kind==="items")autocompleteCache.items=null;
+ if(!kind||kind==="spells")autocompleteCache.spells=null;
+}
+function buildSuggestionEntries(values){
+ const seen=new Map();
+ for(const value of values){
+  const n=norm(value);if(n&&!seen.has(n))seen.set(n,{value,search:n});
+ }
+ return [...seen.values()].sort((a,b)=>a.value.localeCompare(b.value));
+}
+function itemSuggestionEntries(){
+ if(autocompleteCache.items)return autocompleteCache.items;
+ autocompleteCache.items=buildSuggestionEntries(allKnownItemChoices().map(x=>x.name));
+ return autocompleteCache.items;
+}
+function spellSuggestionEntries(){
+ if(autocompleteCache.spells)return autocompleteCache.spells;
+ autocompleteCache.spells=buildSuggestionEntries([...recipeResults,...catalogPendingRows()].map(r=>r.spell));
+ return autocompleteCache.spells;
+}
+function debounce(fn,delay=70){let t=null;return(...args)=>{clearTimeout(t);t=setTimeout(()=>fn(...args),delay)}}
+function attachAutocomplete(input,getEntries,onChange,onEnter){
+ if(!input)return;
+ const menu=document.createElement("div");menu.className="autocomplete-menu hidden";menu.setAttribute("role","listbox");document.body.appendChild(menu);
+ let matches=[],active=-1;
+ const close=()=>{menu.classList.add("hidden");menu.innerHTML="";matches=[];active=-1};
+ const place=()=>{if(menu.classList.contains("hidden"))return;const r=input.getBoundingClientRect();menu.style.left=`${Math.round(r.left)}px`;menu.style.top=`${Math.round(r.bottom+4)}px`;menu.style.width=`${Math.round(r.width)}px`};
+ const paint=()=>{menu.innerHTML=matches.map((v,i)=>`<button type="button" class="autocomplete-option ${i===active?"active":""}" data-i="${i}" role="option" aria-selected="${i===active}">${esc(v)}</button>`).join("");menu.classList.toggle("hidden",!matches.length);if(matches.length)place()};
+ const search=()=>{
+  const q=norm(input.value);if(!q||/^\d+$/.test(q)){close();return}
+  const starts=[],contains=[];
+  for(const e of getEntries()){
+   if(e.search.startsWith(q))starts.push(e.value);
+   else if(e.search.includes(q))contains.push(e.value);
+   if(starts.length>=8)break;
+  }
+  if(starts.length<8){for(const v of contains){starts.push(v);if(starts.length>=8)break}}
+  matches=starts;if(!matches.length){close();return}if(active>=matches.length)active=-1;paint();
+ };
+ const scheduleSearch=debounce(search,55);
+ input.addEventListener("input",()=>{active=-1;scheduleSearch();onChange?.()});
+ input.addEventListener("focus",search);
+ menu.addEventListener("mousedown",e=>{const btn=e.target.closest(".autocomplete-option");if(!btn)return;e.preventDefault();const i=Number(btn.dataset.i);if(!Number.isFinite(i)||!matches[i])return;input.value=matches[i];close();onChange?.(true);input.focus()});
+ input.addEventListener("keydown",e=>{
+  if(menu.classList.contains("hidden")||!matches.length)return;
+  if(e.key==="ArrowDown"){e.preventDefault();active=(active+1)%matches.length;paint();return}
+  if(e.key==="ArrowUp"){e.preventDefault();active=(active-1+matches.length)%matches.length;paint();return}
+  if(e.key==="Tab"||e.key==="Enter"){const i=active>=0?active:0;input.value=matches[i];close();onChange?.(true);if(e.key==="Enter")onEnter?.();e.preventDefault();e.stopImmediatePropagation();return}
+  if(e.key==="Escape"){close();e.stopPropagation()}
+ },true);
+ input.addEventListener("blur",()=>setTimeout(close,120));
+ window.addEventListener("resize",place);window.addEventListener("scroll",place,true);
 }
 
 function liveSettings(){
@@ -334,13 +449,13 @@ function openLootUseModal(entry){
  $("#lootUseTitle").textContent=entry.item;$("#lootUseSubtitle").textContent=`Looted by: ${entry.looter||"Unknown"} • ${uses.length} verified Research use${uses.length===1?"":"s"}`;
  let html=ids.length>1?`<div class="loot-ambiguity"><strong>Multiple exact item IDs share this name:</strong> ${ids.join(", ")}. The EQ log does not identify which one dropped, so all verified uses are shown.</div>`:"";
  if(!uses.length)html+=`<div class="loot-ambiguity">No verified use is indexed yet. Treat this as a coverage gap, not proof the item is useless.</div>`;
- else html+=`<div class="loot-use-grid">`+uses.map(u=>{const other=u.otherMissing;const readiness=u._evidenceOnly?"Verified use — recipe details incomplete":u.canMake?"READY NOW":other===1?"Missing 1 other component":other!=null?`Missing ${other} other components`:"Verified use";const rc=u.canMake?"ready":other===1?"one":"missing";const cls=(u.classes||[]).length?u.classes.join(", "):(u.class&&u.class!=="ALL"?u.class:"");return `<div class="loot-use-card"><h3><span class="use-type ${u._isSubcombine?"subcombine":""}">${u._isSubcombine?"SUBCOMBINE":"SPELL"}</span>${esc(u.spell||u.name||"Unknown")}</h3><div class="meta">${cls?`${esc(cls)} • `:""}${u.trivial!=null?`Research ${u.trivial}`:"Research use verified"}${u.recipeId?` • Recipe #${u.recipeId}`:""}</div><div class="readiness ${rc}">${esc(readiness)}</div>${u.sourceUrl?`<div class="recipe-info"><a href="${esc(u.sourceUrl)}" target="_blank">Open Bastion source ↗</a></div>`:""}</div>`}).join("")+`</div>`;
+ else html+=`<div class="loot-use-grid">`+uses.map(u=>{const other=u.otherMissing;const readiness=u._evidenceOnly?"Verified use — recipe details incomplete":u.canMake?"READY NOW":other===1?"Missing 1 other component":other!=null?`Missing ${other} other components`:"Verified use";const rc=u.canMake?"ready":other===1?"one":"missing";const cls=(u.classes||[]).length?u.classes.join(", "):(u.class&&u.class!=="ALL"?u.class:"");return `<div class="loot-use-card"><h3><span class="use-type ${u._isSubcombine?"subcombine":""}">${u._isSubcombine?"SUBCOMBINE":"SPELL"}</span>${u._isSubcombine?esc(u.spell||u.name||"Unknown"):spellNameWithIcon(u.spell||u.name||"Unknown")}</h3><div class="meta">${cls?`${esc(cls)} • `:""}${u.trivial!=null?`Research ${u.trivial}`:"Research use verified"}${u.recipeId?` • Recipe #${u.recipeId}`:""}</div><div class="readiness ${rc}">${esc(readiness)}</div>${u.sourceUrl?`<div class="recipe-info"><a href="${esc(u.sourceUrl)}" target="_blank">Open Bastion source ↗</a></div>`:""}</div>`}).join("")+`</div>`;
  $("#lootUseBody").innerHTML=html;$("#lootUseModal").classList.remove("hidden");document.body.style.overflow="hidden";
 }
 function closeLootUseModal(){$("#lootUseModal")?.classList.add("hidden");document.body.style.overflow="";}
 function renderLiveFeed(){
- const el=$("#liveLootFeed");if(!el)return;if(!liveLootFeed.length){el.innerHTML='<p class="muted">No live Research loot yet.</p>';return}
- el.innerHTML=liveLootFeed.slice(0,30).map((x,i)=>{const css=x.value==="HIGH VALUE"?"high":x.value==="KEEP"?"keep":"unknown";return `<div class="live-loot-row ${css} clickable" tabindex="0" data-loot-index="${i}" title="Click to see Research uses"><div class="live-loot-head"><strong>${esc(x.item)}</strong><span class="live-value ${css}">${x.value}</span></div><div class="live-loot-looter">Looted by: ${esc(x.looter)}</div><div class="live-loot-meta">${esc(x.timestamp)}${x.uses?` • ${x.uses} verified use(s)`:""}</div>${x.ambiguous?`<div class="live-ambiguous">Multiple exact item IDs share this name; click to see all possibilities.</div>`:""}</div>`}).join("");
+ const el=$("#liveLootFeed");if(!el)return;if(!liveLootFeed.length){el.innerHTML='<p class="muted">No live loot yet.</p>';return}
+ el.innerHTML=liveLootFeed.slice(0,30).map((x,i)=>{const css=x.value==="HIGH VALUE"?"high":x.value==="KEEP"?"keep":x.value==="OTHER"?"other":"unknown";return `<div class="live-loot-row ${css} clickable" tabindex="0" data-loot-index="${i}" title="${x.uses?"Click to see Research uses":"Click for item details"}"><div class="live-loot-head"><strong>${esc(x.item)}</strong><span class="live-value ${css}">${x.value}</span></div><div class="live-loot-looter">Looted by: ${esc(x.looter||"Unknown")}</div><div class="live-loot-meta">${esc(x.timestamp)}${x.uses?` • ${x.uses} verified use(s)`:""}</div>${x.ambiguous?`<div class="live-ambiguous">Multiple exact item IDs share this name; click to see all possibilities.</div>`:""}</div>`}).join("");
  document.querySelectorAll(".live-loot-row.clickable").forEach(row=>{const open=()=>openLootUseModal(liveLootFeed[Number(row.dataset.lootIndex)]);row.onclick=open;row.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open()}}});
 }
 function csvCell(v){const s=String(v??"");return /[",\r\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s}
@@ -367,7 +482,7 @@ function renderLiveSession(){
 }
 function addCraftableAlerts(spells,evt){
  const el=$("#craftableAlerts");if(!el||!spells.length)return;
- const cards=spells.map(r=>`<div class="craftable-now"><strong>SPELL NOW CRAFTABLE</strong><div>${esc(r.spell)}${r.recipeId?` • Bastion #${r.recipeId}`:""}</div><small>${esc(evt.item)} completed the currently tracked requirements.</small></div>`).join("");
+ const cards=spells.map(r=>`<div class="craftable-now"><strong>SPELL NOW CRAFTABLE</strong><div>${spellNameWithIcon(r.spell,r.recipeId?` <small>• Bastion #${r.recipeId}</small>`:"")}</div><small>${esc(evt.item)} completed the currently tracked requirements.</small></div>`).join("");
  el.innerHTML=cards+el.innerHTML;
  if(liveEnabled&&liveSettings().soundCraftable)beep("craftable");
 }
@@ -409,14 +524,23 @@ function processLootEvent(evt,{isReplay=false}={}){
  }else if(isReplay){
   // Replay intentionally includes only relevant items in the visible feed.
  } else {
-  // Unknown loot is tracked only when it looks like a likely Research item.
-  if(/^words? of |^rune of |grimoire|compendium|memoir|writ|tome|signet|emblem|bolts|card of /i.test(evt.item)){
-   liveLootFeed.unshift({item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",value:"UNKNOWN",uses:0,ambiguous:false,ids:[]});
-  }
+  // Keep every observed loot event in the visible live log so the looter is always visible.
+  // Research-like but currently unmapped items remain UNKNOWN; ordinary loot is marked OTHER.
+  const researchLooking=/^words? of |^rune of |grimoire|compendium|memoir|writ|tome|signet|emblem|bolts|card of /i.test(evt.item);
+  liveLootFeed.unshift({item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",value:researchLooking?"UNKNOWN":"OTHER",uses:0,ambiguous:false,ids:[]});
  }
  renderLiveFeed();renderLiveSession();renderSummary();renderList();renderDetail();renderReverseLookup();
  if(newly.length)addCraftableAlerts(newly,evt);
  return true;
+}
+function liveOwnershipSummaryText(mode){
+ return mode==="COUNT"?
+  "Group/personal mode: tracked loot counts provisionally until Magelo confirms it.":
+  "Raid/observation mode: loot is tracked for awareness only and does not affect inventory or recipe readiness.";
+}
+function refreshLiveHeaderStatus(){
+ const mode=$("#lootOwnershipMode")?.value||"COUNT";
+ const el=$("#liveOwnershipSummary");if(el)el.textContent=liveOwnershipSummaryText(mode);
 }
 async function pollLiveMonitor(){
  if(livePollInFlight)return;
@@ -432,7 +556,10 @@ async function pollLiveMonitor(){
   liveMonitorOnline=true;
   $("#liveStatus").textContent=corpusSyncInProgress?"SYNCING":"ONLINE";
   $("#liveStatus").className="live-status online";
-  $("#liveMonitorMessage").textContent=`Watching ${sj.logFile||"EverQuest log"}${sj.character?` for ${sj.character}`:""}. Loot tracking is active.`;
+  const logName=sj.logFile||"EverQuest log";
+  if($("#liveLogName"))$("#liveLogName").textContent=logName;
+  if($("#liveLogBadge"))$("#liveLogBadge").title=`Monitoring ${logName}${sj.character?` for ${sj.character}`:""}`;
+  $("#liveMonitorMessage").textContent=`Watching ${logName}${sj.character?` for ${sj.character}`:""}. Loot tracking is active.`;
 
   const requestSince=liveLastEventId;
   const r=await fetch(apiUrl(`/api/events?since=${requestSince}`),{cache:"no-store"});
@@ -455,6 +582,7 @@ async function pollLiveMonitor(){
   }
   liveMonitorOnline=false;
   if($("#liveStatus")){$("#liveStatus").textContent="OFFLINE";$("#liveStatus").className="live-status offline"}
+  if($("#liveLogName"))$("#liveLogName").textContent="Not connected";
   if($("#liveMonitorMessage"))$("#liveMonitorMessage").textContent=`Live companion not detected at ${LIVE_COMPANION_ORIGIN}: ${e.message}`;
  }finally{
   livePollInFlight=false;
@@ -708,6 +836,7 @@ async function changeLogFile(){
 }
 function setupLiveUI(){
  loadLiveSettings();
+ refreshLiveHeaderStatus();
  if($("#enableLiveAlerts"))$("#enableLiveAlerts").textContent=liveEnabled?"Mute Sounds / Attention Alerts":"Enable Sounds / Attention Alerts";
  if($("#liveMonitorMessage")&&liveEnabled)$("#liveMonitorMessage").textContent="Sounds/attention alerts are enabled by default. Loot tracking is always active while connected.";
  const unlockAudio=()=>{if(liveEnabled)ensureAudio();document.removeEventListener("pointerdown",unlockAudio);document.removeEventListener("keydown",unlockAudio)};
@@ -726,6 +855,7 @@ function setupLiveUI(){
   $("#ownershipModeStatus").textContent=mode==="COUNT"?
    "New tracked loot will count provisionally toward your inventory until a Magelo refresh confirms it.":
    "New loot will be tracked and classified, but will not count toward recipe readiness.";
+  refreshLiveHeaderStatus();
  });
  
  
@@ -751,7 +881,19 @@ function renderMagelo(){
  const c=mageloMeta.counts||{};
  const d=mageloMeta.diagnostics||{};
  status.innerHTML=`Loaded <strong>${esc(mageloMeta.character)}</strong> from Bastion Magelo${mageloMeta.bankHidden?`<div class="magelo-warning">Bank inventory is hidden because this character is Anonymous/Roleplay. The Magelo baseline is incomplete.</div>`:""}${(c.total||0)===0?`<div class="magelo-warning">The Magelo page loaded, but no inventory rows were recognized. Parser strategy: ${d.strategy||"unknown"}; payload found: ${d.payloadFound?"yes":"no"}.</div>`:""}`;
- stats.innerHTML=[["Inventory IDs",c.inventory||0],["Bank IDs",c.bank||0],["Shared Bank IDs",c.sharedBank||0],["Gear IDs",c.gear||0],["Total entries",c.total||0]].map(([a,b])=>`<article><span>${a}</span><strong>${b}</strong></article>`).join("");
+ const researchOwned=mageloInventory.map(x=>({item:x,uses:reverseUsesForItem(x)})).filter(x=>x.uses.length>0);
+ const researchDistinct=researchOwned.length;
+ const researchPieces=researchOwned.reduce((n,x)=>n+Number(x.item.count||0),0);
+ const highValueDistinct=researchOwned.filter(x=>x.uses.length>=5).length;
+ const carried=mageloInventory.filter(x=>x.location==="Inventory").reduce((n,x)=>n+Number(x.count||0),0);
+ const banked=mageloInventory.filter(x=>x.location==="Bank").reduce((n,x)=>n+Number(x.count||0),0);
+ const shared=mageloInventory.filter(x=>x.location==="Shared Bank").reduce((n,x)=>n+Number(x.count||0),0);
+ const readyRecipes=recipeResults.filter(r=>r.missingCount===0).length;
+ stats.innerHTML=`
+  <article class="inventory-insight primary"><span>Research pieces</span><strong>${researchPieces}</strong><small>${researchDistinct} distinct mapped components</small></article>
+  <article class="inventory-insight"><span>High-value components</span><strong>${highValueDistinct}</strong><small>5+ verified Research uses</small></article>
+  <article class="inventory-insight"><span>Ready recipes</span><strong>${readyRecipes}</strong><small>Based on current inventory</small></article>
+  <article class="inventory-insight storage"><span>Where your items are</span><strong>${carried} carried • ${banked} banked${shared?` • ${shared} shared`:""}</strong><small>Player-friendly storage summary</small></article>`;
 }
 async function loadMagelo(value=null){
  if(!liveMonitorOnline){$("#mageloStatus").textContent="Start START-LIVE-MONITOR.bat first.";return}
@@ -761,9 +903,10 @@ async function loadMagelo(value=null){
   const r=await fetch(apiUrl(`/api/magelo?character=${encodeURIComponent(input)}`),{cache:"no-store"}),j=await r.json();
   if(!r.ok||!j.ok)throw Error(j.error||`HTTP ${r.status}`);
   const nextMageloInventory=(j.data.items||[]).map(x=>({source:"Magelo",name:x.name,id:Number(x.id),count:Number(x.count||1),location:x.location,character:x.character}));
+  const nextMageloPlacements=(j.data.placements||[]).map(x=>({source:"Magelo",name:x.name,id:Number(x.id),count:Number(x.count||1),location:x.location,locationLabel:x.locationLabel||x.location,containerNumber:x.containerNumber,rawLocation:x.rawLocation,bagSlot:x.bagSlot,parentId:x.parentId,character:x.character}));
   const nextCounts=mageloCountMap(nextMageloInventory);
   const reconciled=reconcileOwnedLootWithMagelo(previousMageloCounts,nextCounts);
-  mageloMeta=j.data;mageloInventory=nextMageloInventory;previousMageloCounts=nextCounts;
+  mageloMeta=j.data;mageloInventory=nextMageloInventory;mageloPlacements=nextMageloPlacements;previousMageloCounts=nextCounts;
   $("#mageloCharacter").value=j.data.character;try{localStorage.setItem("eqResearchMageloCharacter",j.data.character)}catch{}
   rebuildAggregated();render();
   if(reconciled.length){
@@ -778,7 +921,7 @@ async function restoreMagelo(){
  if(saved){$("#mageloCharacter").value=saved;await loadMagelo(saved)}
 }
 function clearMagelo(){
- mageloInventory=[];mageloMeta=null;previousMageloCounts=null;try{localStorage.removeItem("eqResearchMageloCharacter")}catch{}
+ mageloInventory=[];mageloPlacements=[];mageloMeta=null;previousMageloCounts=null;try{localStorage.removeItem("eqResearchMageloCharacter")}catch{}
  $("#mageloCharacter").value="";rebuildAggregated();render();
 }
 function renderChars(){const el=$("#characterChips");if(!el)return;el.innerHTML=inventorySources.map(s=>`<div class="character-chip"><strong>${esc(s.character)}</strong><span>${s.rows} rows</span></div>`).join("")}
@@ -800,13 +943,18 @@ async function loadFiles(fs){
  if(fileStatus)fileStatus.textContent=`Inventory file loaded • ${inventorySources.length} file(s) • ${aggregated.length} unique item IDs combined.`;
  render();
 }
-["classFilter","statusFilter","spellSearch","characterLevel","researchSkill"].forEach(id=>{
+["classFilter","statusFilter","characterLevel","researchSkill"].forEach(id=>{
  const el=$("#"+id);
  if(el)el.oninput=()=>{renderSummary();renderList();renderDetail()};
 });
-["reverseSearch","reverseClassFilter","reverseStatusFilter"].forEach(id=>$("#"+id)?.addEventListener("input",renderReverseLookup));
+["reverseClassFilter","reverseStatusFilter"].forEach(id=>$("#"+id)?.addEventListener("input",renderReverseLookup));
+const scheduleSpellSearchRender=debounce(()=>{renderSummary();renderList()},90);
+const scheduleReverseLookup=debounce(renderReverseLookup,90);
 
 $("#quickLootButton")?.addEventListener("click",runQuickLookup);$("#quickLootSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter")runQuickLookup()});
+attachAutocomplete($("#quickLootSearch"),itemSuggestionEntries,()=>{},runQuickLookup);
+attachAutocomplete($("#reverseSearch"),itemSuggestionEntries,immediate=>immediate?renderReverseLookup():scheduleReverseLookup(),renderReverseLookup);
+attachAutocomplete($("#spellSearch"),spellSuggestionEntries,immediate=>{if(immediate){renderSummary();renderList()}else scheduleSpellSearchRender()},()=>{renderSummary();renderList()});
 
 $("#refreshMagelo")?.addEventListener("click",()=>{$("#mageloStatus").textContent="Contacting Bastion Magelo…";loadMagelo()});
 $("#inventoryFileInstead")?.addEventListener("click",()=>$("#inventoryFiles")?.click());

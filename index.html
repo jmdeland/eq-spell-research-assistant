@@ -1,152 +1,128 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>EverQuest Spell Research Assistant</title><link rel="stylesheet" href="styles.css"></head><body>
-<header><div><div class="eyebrow">EVERQUEST RESEARCH TOOL</div><h1>Spell Research Assistant</h1><p>Load your inventory, choose a class, see what you can make, and plan Research skill-ups.</p></div><div class="version">v0.15.0</div></header>
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/>
+<title>EverQuest Research &amp; Loot Tool</title><link href="styles.css" rel="stylesheet"/></head><body>
+<header class="app-hero"><div class="hero-shell"><div class="brand-mark" aria-hidden="true"><span class="brand-mark-star">✦</span><span class="brand-mark-ring"></span></div><div class="brand-copy"><div class="eyebrow">EVERQUEST RESEARCH &amp; LOOT TOOL <span class="byline">by Bromm</span></div><h1><span>Spell Research Assistant</span><span class="title-join">&amp;</span><span class="title-accent">Live Loot Monitor</span></h1><p>Track drops as they happen, locate useful components, and turn your inventory into research-ready spells.</p><div class="hero-badges" aria-label="Primary tools"><span><i class="hero-dot live"></i>Live Loot</span><span>Inventory Mapping</span><span>Spell Research</span></div></div><div class="header-actions"><div class="version">v0.16.0</div><button aria-label="Open Settings" class="settings-button" id="openSettings" type="button">⚙ Settings</button></div></div></header>
 <section class="quick-lookup-bar"><div class="quick-inner">
 <div><strong>Quick Loot Lookup</strong><small>What did you just find?</small></div>
-<input id="quickLootSearch" placeholder="Type item name or item ID…"><button id="quickLootButton">Find Research Uses</button>
-</div><div id="quickLootResult" class="quick-result"></div></section>
+<input id="quickLootSearch" placeholder="Type item name or item ID…"/><button id="quickLootButton">Find Research Uses</button>
+</div><div class="quick-result" id="quickLootResult"></div></section>
 <main>
-<section class="panel update-panel" id="updatePanel">
- <div class="panel-title">
-  <div><h2>Application Updates</h2><p>Check the public GitHub stable channel. Updates are downloaded, SHA-256 verified, backed up, installed, and restarted through the local companion.</p></div>
-  <span id="updateStatusBadge" class="live-status offline">NOT CHECKED</span>
- </div>
- <div class="update-actions">
-  <button id="checkForUpdates">Check for Updates</button>
-  <button id="downloadLatestUpdate" class="ghost" disabled>Download & Verify Update</button>
-  <button id="installVerifiedUpdate" class="danger" disabled>Install Update</button>
-  <a id="openReleasePage" class="button-link ghost hidden" href="#" target="_blank" rel="noopener">Open Release Page ↗</a>
- </div>
- <div id="updateVersionGrid" class="update-version-grid">
-   <div><span>Demo build</span><strong>v0.15.0</strong></div>
-   <div><span>Stable baseline</span><strong>v0.14.0</strong></div>
-   <div><span>Latest stable</span><strong id="latestStableVersion">Not checked</strong></div>
- </div>
- <div id="updateStatus" class="status muted">Updater ready. Check GitHub for a newer stable release.</div>
- <div id="previousUpdateResult" class="update-result-card hidden"></div>
- <div id="backupSummary" class="update-backup-summary hidden"></div>
- <div id="updateProgress" class="update-progress hidden"><div id="updateProgressBar"></div></div>
- <div id="updateReleaseNotes" class="update-release-notes hidden"></div>
-</section>
+
+
 
 <section class="panel live-panel">
- <div class="panel-title">
-   <div><h2>Live Loot Monitor</h2><p>Loot tracking runs automatically whenever the companion is ONLINE. Sounds/attention alerts are optional.</p></div>
-   <div id="liveStatus" class="live-status offline">OFFLINE</div>
- </div>
-
- <div class="corpus-sync">
-  <div>
-    <strong>Bastion Research Corpus</strong>
-    <span id="corpusSyncStatus">Built-in verified recipes loaded. Live sync not checked yet.</span>
-  </div>
-  <button id="syncBastionCorpus">Sync Complete Bastion Research Data</button>
+<div class="panel-title">
+<div><div class="eyebrow panel-kicker">LIVE ACTIVITY</div><h2>Live Loot Monitor</h2><p id="liveMonitorSummary">Watch every drop in real time. Useful Research pieces are identified automatically. <span id="liveOwnershipSummary">Tracked loot counts provisionally until Magelo confirms it.</span></p></div>
+<div class="live-heading-status"><div class="live-log-badge" id="liveLogBadge" title="Active EverQuest log"><span class="live-log-mark">LOG</span><span id="liveLogName">Not connected</span></div><div class="live-status offline" id="liveStatus">OFFLINE</div></div>
 </div>
-<div class="corpus-sync metadata-sync">
-  <div>
-    <strong>Bastion Spell Metadata</strong>
-    <span id="spellMetadataStatus">Packaged metadata loaded. Full Bastion class/level sync not checked yet.</span>
-  </div>
-  <button id="syncSpellMetadata">Sync Spell Class / Level Data</button>
+
+
+
+
+<div class="sr-only" id="liveMonitorMessage" aria-live="polite">Live monitoring is not connected yet.</div>
+<div class="sr-only" id="ownershipModeStatus">New tracked loot will count provisionally toward your inventory until a Magelo refresh confirms it.</div>
+
+<div class="live-grid">
+<div>
+<h3>Recent Loot</h3>
+<div class="live-feed" id="liveLootFeed"><p class="muted">No live loot yet.</p></div>
 </div>
- <div class="live-controls">
-   <button id="enableLiveAlerts">Mute Sounds / Attention Alerts</button><button id="changeLogFile" class="ghost">Change Log File</button>
-   <button id="testLiveReplay" class="ghost">Test Recent Log (No Session Changes)</button>
-   <button id="exportSessionLoot" class="ghost">Export Session Loot CSV</button>
-   <label><span>Loot ownership</span><select id="lootOwnershipMode">
-     <option value="COUNT" selected>Group / personal — count tracked loot as owned</option>
-     <option value="TRACK_ONLY">Raid / observation — track only</option>
-   </select></label>
-   <label class="check-card"><input id="liveIncludeOthers" type="checkbox"><span><strong>Include other characters</strong><small>Alert on group/raid members shown in this log.</small></span></label>
-   <label class="check-card"><input id="liveClassOnly" type="checkbox"><span><strong>Selected class only</strong><small>Value alerts only for the selected Research class.</small></span></label>
- </div>
-
- <h3 class="alert-heading">Alert Configuration</h3><div class="live-settings">
-   <label class="check-card"><input id="soundHighValue" type="checkbox" checked><span><strong>Sound: High value</strong><small>Distinct high-value alert.</small></span></label>
-   <label class="check-card"><input id="soundAnyResearch" type="checkbox"><span><strong>Sound: Any Research</strong><small>Alert for every verified Research item.</small></span></label>
-   <label class="check-card"><input id="soundCraftable" type="checkbox" checked><span><strong>Sound: Spell now craftable</strong><small>Strong alert when a verified spell becomes ready.</small></span></label>
-   <label><span>High-value threshold</span><input id="highValueThreshold" type="number" min="1" max="50" value="5"></label>
-   <label><span>Sound volume</span><input id="liveVolume" type="range" min="0" max="100" value="65"></label>
- </div>
-
- <div id="liveMonitorMessage" class="status muted">Live monitoring is not connected yet.</div>
-<div id="ownershipModeStatus" class="status muted">New tracked loot will count provisionally toward your inventory until a Magelo refresh confirms it.</div>
-<div class="status muted"><strong>Companion address:</strong> http://127.0.0.1:8765/ &nbsp; <a href="http://127.0.0.1:8765/api/status" target="_blank">Test connection</a></div>
-
- <div class="live-grid">
-   <div>
-     <h3>Recent Research Loot</h3>
-     <div id="liveLootFeed" class="live-feed"><p class="muted">No live Research loot yet.</p></div>
-   </div>
-   <div>
-     <h3>Session Research Loot</h3>
-     <div id="liveSessionSummary" class="live-session"><p class="muted">Nothing tracked this session.</p></div>
-   </div>
- </div>
-
- <div id="craftableAlerts" class="craftable-alerts"></div>
+<div>
+<h3>Session Research Loot</h3>
+<div class="live-session" id="liveSessionSummary"><p class="muted">Nothing tracked this session.</p></div>
+</div>
+</div>
+<div class="craftable-alerts" id="craftableAlerts"></div>
 </section>
 
-<section class="panel magelo-panel">
- <div class="panel-title">
-  <div><h2>1. Bastion Magelo Inventory</h2><p>Primary inventory source. Enter a Bastion character name or full Magelo URL, then refresh to load inventory, bank, and shared bank when public.</p></div>
-  <span id="mageloStatusBadge" class="live-status offline">NOT LOADED</span>
- </div>
- <div class="magelo-controls">
-  <input id="mageloCharacter" placeholder="charactername or https://characters.bastiongame.com/character/charactername">
-  <button id="refreshMagelo">Load / Refresh Magelo</button>
-  <button id="inventoryFileInstead" class="ghost">Use Inventory Output File Instead</button>
-  <button id="clearMagelo" class="ghost">Clear Magelo</button>
-  <input id="inventoryFiles" type="file" accept=".txt,.csv,.tsv" multiple hidden>
- </div>
- <div id="mageloStatus" class="status muted">No Magelo character loaded yet.</div>
- <div id="inventoryFileStatus" class="status muted"></div>
- <div id="mageloStats" class="summary-grid compact-summary"></div>
+<section class="setup-workspace">
+<section class="panel magelo-panel workspace-card inventory-card">
+<div class="panel-title">
+<div><h2>Inventory</h2><p>Primary inventory source. Enter a Bastion character name or full Magelo URL, then refresh to load inventory, bank, and shared bank when public.</p></div>
+<span class="live-status offline" id="mageloStatusBadge">NOT LOADED</span>
+</div>
+<div class="magelo-controls">
+<input id="mageloCharacter" placeholder="charactername or https://characters.bastiongame.com/character/charactername"/>
+<button id="refreshMagelo">Load / Refresh Magelo</button>
+<button class="ghost" id="inventoryFileInstead">Use Inventory Output File Instead</button>
+<button class="ghost" id="clearMagelo">Clear Magelo</button>
+<input accept=".txt,.csv,.tsv" hidden="" id="inventoryFiles" multiple="" type="file"/>
+</div>
+<div class="status muted" id="mageloStatus">No Magelo character loaded yet.</div>
+<div class="status muted" id="inventoryFileStatus"></div>
+<div class="summary-grid compact-summary" id="mageloStats"></div>
 </section>
+<section class="panel workspace-card filter-card">
+<div class="planner-controls"><div><h2>Research Filters</h2><p>Confirmed Research spells stay visible even when the exact Bastion combine is still awaiting verification.</p></div>
+<div class="control-row">
 
 
-
-<section class="panel">
- <div class="planner-controls"><div><h2>2. Choose Research Class</h2><p>Confirmed Research spells stay visible even when the exact Bastion combine is still awaiting verification.</p></div>
- <div class="control-row">
-  <label class="check-card"><input id="bastionRules" type="checkbox" checked><span><strong>Use Bastion rules</strong><small>Recommended for Bastion.</small></span></label>
-  <label class="check-card"><input id="vendorBasics" type="checkbox" checked><span><strong>Assume vendor basics</strong><small>Quill / Piece of Parchment.</small></span></label>
-  <label><span>Class</span><select id="classFilter"><option value="ALL">All classes</option><option>CLR</option><option>DRU</option><option>SHM</option><option>ENC</option><option>MAG</option><option>NEC</option><option>WIZ</option><option>PAL</option><option>RNG</option><option>SHD</option><option>BST</option></select></label>
-  <label><span>Level</span><input id="characterLevel" type="number" min="1" max="70" placeholder="optional"></label>
-  <label><span>Research skill</span><input id="researchSkill" type="number" min="0" max="300" placeholder="optional"></label>
- </div></div>
+<label><span>Class</span><select id="classFilter"><option value="ALL">All classes</option><option>CLR</option><option>DRU</option><option>SHM</option><option>ENC</option><option>MAG</option><option>NEC</option><option>WIZ</option><option>PAL</option><option>RNG</option><option>SHD</option><option>BST</option></select></label>
+<label><span>Level</span><input id="characterLevel" max="70" min="1" placeholder="optional" type="number"/></label>
+<label><span>Research skill</span><input id="researchSkill" max="300" min="0" placeholder="optional" type="number"/></label>
+</div></div>
 </section>
-
-<section class="summary-grid"><article><span>Ready now</span><strong id="sumReady">0</strong></article><article><span>Missing 1</span><strong id="sumOne">0</strong></article><article><span>Recipe pending</span><strong id="sumPending">0</strong></article><article><span>Research spells shown</span><strong id="sumShown">0</strong></article></section>
-
+</section>
+<section class="summary-grid planner-metrics"><article><span>Ready now</span><strong id="sumReady">0</strong></article><article><span>Missing 1</span><strong id="sumOne">0</strong></article><article><span>Recipe pending</span><strong id="sumPending">0</strong></article><article><span>Research spells shown</span><strong id="sumShown">0</strong></article></section>
+<div class="workspace-heading"><div><div class="eyebrow">RESEARCH WORKSPACE</div><h2>Spell Planner</h2></div><p>Choose a spell to inspect ingredients and readiness.</p></div>
 <section class="research-layout">
- <section class="panel spell-list-panel">
-  <div class="toolbar"><div><h2>3. Researchable Spells</h2><p>Mapped recipes are sorted by readiness; Bastion-confirmed unresolved spells remain visible.</p></div><div class="filters">
-   <select id="statusFilter"><option value="ALL">All statuses</option><option value="READY">Ready now</option><option value="ONE_SHORT">Missing 1</option><option value="TWO_SHORT">Missing 2</option><option value="MISSING">Missing 3+</option><option value="PENDING">Recipe pending</option></select>
-   <input id="spellSearch" placeholder="Search researchable spells"></div></div>
-  <div id="spellList" class="simple-spell-list"></div>
- </section>
- <section class="panel detail-panel"><div id="spellDetail" class="detail-empty"><h2>Select a spell</h2><p>Choose a spell to see what you have and what you still need.</p></div></section>
+<section class="panel spell-list-panel">
+<div class="toolbar"><div><h2>Researchable Spells</h2><p>Mapped recipes are sorted by readiness; Bastion-confirmed unresolved spells remain visible.</p></div><div class="filters">
+<select id="statusFilter"><option value="ALL">All statuses</option><option value="READY">Ready now</option><option value="ONE_SHORT">Missing 1</option><option value="TWO_SHORT">Missing 2</option><option value="MISSING">Missing 3+</option><option value="PENDING">Recipe pending</option></select>
+<input id="spellSearch" placeholder="Search researchable spells"/></div></div>
+<div class="simple-spell-list" id="spellList"></div>
+</section>
+<section class="panel detail-panel"><div class="detail-pane-label">SELECTED SPELL</div><div class="detail-empty" id="spellDetail"><h2>Select a spell</h2><p>Choose a spell to see what you have and what you still need.</p></div></section>
+</section>
+<section class="panel utility-panel">
+<div class="panel-title"><div><h2>Item Lookup</h2><p>Enter a research item name or exact item ID to see mapped spells, verified subcombines, and Bastion item-use evidence.</p></div></div>
+<div class="reverse-controls">
+<input id="reverseSearch" placeholder="e.g. Words of Expertise or 65349"/>
+<select id="reverseClassFilter"><option value="ALL">All classes</option><option>CLR</option><option>DRU</option><option>SHM</option><option>ENC</option><option>MAG</option><option>NEC</option><option>WIZ</option><option>PAL</option><option>RNG</option><option>SHD</option><option>BST</option></select>
+<select id="reverseStatusFilter"><option value="ALL">All uses</option><option value="READY">Ready now</option><option value="ONE_SHORT">Missing 1 other item</option></select>
+</div>
+<div class="status muted" id="reverseSummary">Search by item name or ID, or click “Show Research Uses” on an inventory item.</div>
+<div class="reverse-results" id="reverseResults"></div>
 </section>
 
-
-
-<section class="panel">
- <div class="panel-title"><div><h2>4. Reverse Item Lookup</h2><p>Enter a research item name or exact item ID to see mapped spells, verified subcombines, and Bastion item-use evidence.</p></div></div>
- <div class="reverse-controls">
-   <input id="reverseSearch" placeholder="e.g. Words of Expertise or 65349">
-   <select id="reverseClassFilter"><option value="ALL">All classes</option><option>CLR</option><option>DRU</option><option>SHM</option><option>ENC</option><option>MAG</option><option>NEC</option><option>WIZ</option><option>PAL</option><option>RNG</option><option>SHD</option><option>BST</option></select>
-   <select id="reverseStatusFilter"><option value="ALL">All uses</option><option value="READY">Ready now</option><option value="ONE_SHORT">Missing 1 other item</option></select>
- </div>
- <div id="reverseSummary" class="status muted">Search by item name or ID, or click “Show Research Uses” on an inventory item.</div>
- <div id="reverseResults" class="reverse-results"></div>
-</section>
-
-<details class="panel advanced-panel"><summary>Advanced / Data Tools</summary><div class="advanced-inner">
- <div class="advanced-grid"><div><h3>Research Evidence Queue</h3><div id="evidenceQueue"></div></div><div><h3>Dataset Audit</h3><div id="auditCards" class="summary-grid"></div><div id="auditDetails"></div></div></div>
-</div></details>
 </main><footer>Offline tool • Your inventory stays on your computer</footer>
-<script src="data/recipes.js"></script><script src="data/bastion-recipes.js"></script><script src="data/spell-catalog.js"></script><script src="app.js"></script>
-<div id="lootUseModal" class="modal-backdrop hidden" aria-hidden="true"><div class="loot-modal" role="dialog" aria-modal="true"><div class="loot-modal-head"><div><div class="eyebrow">RESEARCH COMPONENT</div><h2 id="lootUseTitle">Research Uses</h2><div id="lootUseSubtitle" class="muted"></div></div><button id="closeLootUseModal" type="button" class="ghost modal-close" aria-label="Close popup">×</button></div><div id="lootUseBody" class="loot-use-body"></div></div></div>
-</body></html>
+
+<div aria-hidden="true" class="modal-backdrop hidden" id="lootUseModal"><div aria-modal="true" class="loot-modal" role="dialog"><div class="loot-modal-head"><div><div class="eyebrow">RESEARCH COMPONENT</div><h2 id="lootUseTitle">Research Uses</h2><div class="muted" id="lootUseSubtitle"></div></div><button aria-label="Close popup" class="ghost modal-close" id="closeLootUseModal" type="button">×</button></div><div class="loot-use-body" id="lootUseBody"></div></div></div>
+<div aria-hidden="true" class="settings-overlay hidden" id="settingsOverlay"><section aria-labelledby="settingsTitle" aria-modal="true" class="settings-screen" role="dialog"><div class="settings-head"><div class="settings-brand"><div class="settings-mark" aria-hidden="true"><span>⚙</span></div><div><div class="eyebrow">EVERQUEST RESEARCH &amp; LOOT TOOL <span class="byline">by Bromm</span></div><h2 id="settingsTitle">Settings &amp; Configuration</h2><p>Appearance, live monitoring, Bastion data, alerts, and application maintenance.</p></div></div><button aria-label="Close Settings" class="ghost settings-close" id="closeSettings" type="button">×</button></div><div class="settings-body"><section class="settings-section"><div class="settings-section-title"><h3>General</h3><p>Default Research behavior used throughout the planner.</p></div><div class="settings-control-grid"><label class="skin-control"><span>Appearance</span><select id="skinSelector"><option value="default" selected>Default</option><option value="eqblue">EQBlue</option><option value="eqgold">EQGold</option><option value="eqred">EQRed</option></select><small>Color schemes share the same workspace layout; texture and artwork will continue to evolve.</small></label><label class="check-card"><input checked="" id="bastionRules" type="checkbox"/><span><strong>Use Bastion rules</strong><small>Recommended for Bastion.</small></span></label><label class="check-card"><input checked="" id="vendorBasics" type="checkbox"/><span><strong>Assume vendor basics</strong><small>Quill / Piece of Parchment.</small></span></label></div></section><section class="settings-section"><div class="settings-section-title"><h3>Live Monitor</h3><p>Control the EverQuest log connection, ownership behavior, session tools, and alerts.</p></div><div class="live-controls">
+<button id="enableLiveAlerts">Mute Sounds / Attention Alerts</button><button class="ghost" id="changeLogFile">Change Log File</button>
+<button class="ghost" id="testLiveReplay">Test Recent Log (No Session Changes)</button>
+<button class="ghost" id="exportSessionLoot">Export Session Loot CSV</button>
+<label><span>Loot ownership</span><select id="lootOwnershipMode">
+<option selected="" value="COUNT">Group / personal — count tracked loot as owned</option>
+<option value="TRACK_ONLY">Raid / observation — track only</option>
+</select></label>
+<label class="check-card"><input checked="" id="liveIncludeOthers" type="checkbox"/><span><strong>Include other characters</strong><small>Alert on group/raid members shown in this log.</small></span></label>
+<label class="check-card"><input id="liveClassOnly" type="checkbox"/><span><strong>Selected class only</strong><small>Value alerts only for the selected Research class.</small></span></label>
+</div><h3 class="alert-heading">Alert Configuration</h3><div class="live-settings">
+<label class="check-card"><input checked="" id="soundHighValue" type="checkbox"/><span><strong>Sound: High value</strong><small>Distinct high-value alert.</small></span></label>
+<label class="check-card"><input id="soundAnyResearch" type="checkbox"/><span><strong>Sound: Any Research</strong><small>Alert for every verified Research item.</small></span></label>
+<label class="check-card"><input checked="" id="soundCraftable" type="checkbox"/><span><strong>Sound: Spell now craftable</strong><small>Strong alert when a verified spell becomes ready.</small></span></label>
+<label><span>High-value threshold</span><input id="highValueThreshold" max="50" min="1" type="number" value="5"/></label>
+<label><span>Sound volume</span><input id="liveVolume" max="100" min="0" type="range" value="65"/></label>
+</div><div class="status muted"><strong>Companion address:</strong> http://127.0.0.1:8765/   <a href="http://127.0.0.1:8765/api/status" target="_blank">Test connection</a></div></section><section class="settings-section"><div class="settings-section-title"><h3>Bastion Data</h3><p>Refresh verified Research recipes and spell class/level metadata.</p></div><div class="corpus-sync">
+<div>
+<strong>Bastion Research Corpus</strong>
+<span id="corpusSyncStatus">Built-in verified recipes loaded. Live sync not checked yet.</span>
+</div>
+<button id="syncBastionCorpus">Sync Complete Bastion Research Data</button>
+</div><div class="corpus-sync metadata-sync">
+<div>
+<strong>Bastion Spell Metadata</strong>
+<span id="spellMetadataStatus">Packaged metadata loaded. Full Bastion class/level sync not checked yet.</span>
+</div>
+<button id="syncSpellMetadata">Sync Spell Class / Level Data</button>
+</div></section><section class="settings-section"><div class="settings-section-title"><h3>Application Updates</h3><p>Stable releases are downloaded from GitHub, SHA-256 verified, backed up, installed, and restarted through the local companion.</p><span class="live-status offline" id="updateStatusBadge">NOT CHECKED</span></div><div class="update-actions">
+<button id="checkForUpdates">Check for Updates</button>
+<button class="ghost" disabled="" id="downloadLatestUpdate">Download &amp; Verify Update</button>
+<button class="danger" disabled="" id="installVerifiedUpdate">Install Update</button>
+<a class="button-link ghost hidden" href="#" id="openReleasePage" rel="noopener" target="_blank">Open Release Page ↗</a>
+</div><div class="update-version-grid" id="updateVersionGrid">
+<div><span>Installed version</span><strong>v0.16.0</strong></div>
+<div><span>Latest stable</span><strong id="latestStableVersion">Not checked</strong></div>
+</div><div class="status muted" id="updateStatus">Updater ready. Check GitHub for a newer stable release.</div><div class="update-result-card hidden" id="previousUpdateResult"></div><div class="update-backup-summary hidden" id="backupSummary"></div><div class="update-progress hidden" id="updateProgress"><div id="updateProgressBar"></div></div><div class="update-release-notes hidden" id="updateReleaseNotes"></div></section><section class="settings-section"><div class="settings-section-title"><h3>Advanced / Data Tools</h3><p>Evidence queue and dataset diagnostics intended for troubleshooting and data maintenance.</p></div><div class="advanced-grid"><div><h3>Research Evidence Queue</h3><div id="evidenceQueue"></div></div><div><h3>Dataset Audit</h3><div class="summary-grid" id="auditCards"></div><div id="auditDetails"></div></div></div></section></div></section></div><script src="data/recipes.js"></script><script src="data/bastion-recipes.js"></script><script src="data/spell-catalog.js"></script><script src="data/spell-icons.js"></script><script src="app.js"></script><script src="settings.js"></script></body></html>
