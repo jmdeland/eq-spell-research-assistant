@@ -7,6 +7,8 @@ $syncDataPath = Join-Path $root "data\bastion-synced-recipes.json"
 $userDataRoot = Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"
 if(-not (Test-Path -LiteralPath $userDataRoot)){New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null}
 $sessionStatePath = Join-Path $userDataRoot "session-loot.jsonl"
+$trayPidPath = Join-Path $userDataRoot "tray.pid"
+$shutdownRequestPath = Join-Path $userDataRoot "shutdown-for-update.request"
 
 function Get-Config {
     if (Test-Path $configPath) {
@@ -36,7 +38,7 @@ function Strip-Html([string]$html) {
     return ([regex]::Replace($x,'\s+',' ')).Trim()
 }
 function Invoke-Bastion([string]$url) {
-    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Research-Loot-Tool/0.16.1"}).Content
+    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Research-Loot-Tool/0.16.2"}).Content
 }
 function Parse-RecipePage([int]$id,[string]$html) {
     $plain=Strip-Html $html
@@ -472,7 +474,7 @@ function Convert-VersionCore([string]$version){
     return [version]("{0}.{1}.{2}" -f $parts[0],$parts[1],$parts[2])
 }
 function Get-LatestGitHubRelease {
-    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.1";"Accept"="application/vnd.github+json"}
+    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.2";"Accept"="application/vnd.github+json"}
     return Invoke-RestMethod -UseBasicParsing -Uri $updateApi -TimeoutSec 45 -Headers $headers
 }
 function Get-UpdateInfo {
@@ -512,7 +514,7 @@ function Download-AndVerifyLatestUpdate {
     $dest=Join-Path $updateStage $info.assetName
     $tmp=$dest+".download"
     if(Test-Path -LiteralPath $tmp){Remove-Item -LiteralPath $tmp -Force}
-    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.1"}
+    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.2"}
     try{
         Invoke-WebRequest -UseBasicParsing -Uri $info.assetUrl -OutFile $tmp -TimeoutSec 120 -Headers $headers
         $actual=(Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -562,6 +564,11 @@ function Start-SafeVerifiedUpdate {
 
     $updaterPath=Join-Path $env:TEMP ("EQSpellResearchUpdater_" + [guid]::NewGuid().ToString("N") + ".ps1")
     $pidToWait=$PID
+    $trayPidToWait=0
+    if(Test-Path -LiteralPath $trayPidPath){
+        try{$trayPidToWait=[int](Get-Content -LiteralPath $trayPidPath -Raw).Trim()}catch{$trayPidToWait=0}
+    }
+    Set-Content -LiteralPath $shutdownRequestPath -Value ((Get-Date).ToString("o")) -Encoding ASCII
     $script=@'
 param(
  [Parameter(Mandatory=$true)][string]$Root,
@@ -569,6 +576,7 @@ param(
  [Parameter(Mandatory=$true)][string]$ExpectedSha256,
  [Parameter(Mandatory=$true)][string]$BackupPath,
  [Parameter(Mandatory=$true)][int]$WaitForPid,
+ [int]$WaitForTrayPid=0,
  [Parameter(Mandatory=$true)][string]$LatestTag
 )
 $ErrorActionPreference="Stop"
@@ -581,12 +589,15 @@ function Write-UpdaterLog([string]$Message){
 try {
     Set-Location -LiteralPath $env:TEMP
     Write-UpdaterLog ("Updater started. Root={0}; Zip={1}; Backup={2}" -f $Root,$ZipPath,$BackupPath)
-    for($i=0;$i -lt 120;$i++){
-        $p=Get-Process -Id $WaitForPid -ErrorAction SilentlyContinue
-        if(-not $p){break}
+    for($i=0;$i -lt 160;$i++){
+        $monitorAlive=$null -ne (Get-Process -Id $WaitForPid -ErrorAction SilentlyContinue)
+        $trayAlive=$false
+        if($WaitForTrayPid -gt 0){$trayAlive=$null -ne (Get-Process -Id $WaitForTrayPid -ErrorAction SilentlyContinue)}
+        if(-not $monitorAlive -and -not $trayAlive){break}
         Start-Sleep -Milliseconds 250
     }
     if(Get-Process -Id $WaitForPid -ErrorAction SilentlyContinue){throw "The running companion did not exit in time."}
+    if($WaitForTrayPid -gt 0 -and (Get-Process -Id $WaitForTrayPid -ErrorAction SilentlyContinue)){throw "The system tray companion did not exit in time."}
 
     $actual=(Get-FileHash -LiteralPath $ZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
     if($actual -ne $ExpectedSha256.ToLowerInvariant()){throw "SHA-256 verification failed immediately before install."}
@@ -634,7 +645,7 @@ try {
         }
     } catch { Write-UpdaterLog ("Backup retention warning: " + $_.Exception.Message) }
 
-    $bat=Join-Path $Root "START-LIVE-MONITOR.bat"
+    $bat=Join-Path $Root "START-RESEARCH-TOOL.bat"
     $restartCommand='start "" "{0}"' -f $bat
     Write-UpdaterLog "Install completed. Restarting application."
     Start-Process -FilePath "cmd.exe" -ArgumentList @("/c",$restartCommand) -WorkingDirectory $Root
@@ -650,7 +661,7 @@ try {
         $err=[pscustomobject]@{ok=$false;error=$message;failedAt=(Get-Date).ToString("o")} | ConvertTo-Json -Depth 4
         if(Test-Path -LiteralPath $Root){
             $err | Set-Content -LiteralPath (Join-Path $Root "update-result.json") -Encoding UTF8
-            $rollbackBat=Join-Path $Root "START-LIVE-MONITOR.bat"
+            $rollbackBat=Join-Path $Root "START-RESEARCH-TOOL.bat"
             if(Test-Path -LiteralPath $rollbackBat){
                 $rollbackCommand='start "" "{0}"' -f $rollbackBat
                 Start-Process -FilePath "cmd.exe" -ArgumentList @("/c",$rollbackCommand) -WorkingDirectory $Root
@@ -671,10 +682,11 @@ try {
         "-ExpectedSha256",('"{0}"' -f $info.expectedSha256),
         "-BackupPath",('"{0}"' -f $backupPath),
         "-WaitForPid",$pidToWait,
+        "-WaitForTrayPid",$trayPidToWait,
         "-LatestTag",('"{0}"' -f $info.latestTag)
     )
     Start-Process powershell.exe -WindowStyle Normal -WorkingDirectory $env:TEMP -ArgumentList $updaterArgs
-    return [pscustomobject]@{ok=$true;latestTag=$info.latestTag;backupPath=$backupPath;zipPath=$zipPath;sha256=$actual}
+    return [pscustomobject]@{ok=$true;latestTag=$info.latestTag;backupPath=$backupPath;zipPath=$zipPath;sha256=$actual;trayPid=$trayPidToWait}
 }
 
 function Read-RequestJson($req) {
@@ -709,7 +721,7 @@ function Clear-SessionState {
 
 $shutdownForUpdate=$false
 $listener=New-Object Net.HttpListener;$prefix="http://127.0.0.1:$port/";$listener.Prefixes.Add($prefix);$listener.Start()
-Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.16.1";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
+Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.16.2";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
 Start-Process ($prefix + "index.html")
 
 try{
@@ -765,7 +777,8 @@ while($listener.IsListening){
 
         if($path -eq "/api/status"){
             $sync=$null;if(Test-Path $syncDataPath){try{$sync=Get-Content $syncDataPath -Raw|ConvertFrom-Json}catch{}}
-            $payload=[pscustomobject]@{active=$true;logPath=$logPath;logFile=$logFileName;character=$character;lastEventId=$nextId-1;position=$position;sync=$(if($sync){[pscustomobject]@{syncedAt=$sync.syncedAt;recipeCount=@($sync.recipes).Count;errors=@($sync.errors).Count}}else{$null})}|ConvertTo-Json -Depth 8
+            $appVersion=Get-AppVersionInfo
+            $payload=[pscustomobject]@{app="EverQuest Research & Loot Tool";version=[string]$appVersion.version;channel=[string]$appVersion.channel;root=$root;active=$true;logPath=$logPath;logFile=$logFileName;character=$character;lastEventId=$nextId-1;position=$position;sync=$(if($sync){[pscustomobject]@{syncedAt=$sync.syncedAt;recipeCount=@($sync.recipes).Count;errors=@($sync.errors).Count}}else{$null})}|ConvertTo-Json -Depth 8
             $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.StatusCode=200;$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
         }
         if($path -eq "/api/events"){

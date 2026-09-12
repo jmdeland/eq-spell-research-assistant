@@ -1,6 +1,32 @@
 # Changelog
 
-## v0.16.1
+## v0.16.2
+
+- Hotfixes the self-updater so the system-tray companion and live monitor both release the application folder before replacement.
+- Stores tray/update coordination files under LocalAppData, outside the installation folder.
+- Runs the tray with a TEMP working directory and explicitly releases icon resources.
+- Restarts the full tray launcher after successful updates and rollbacks.
+- Adds version-aware launcher behavior so a stale companion on port 8765 is not silently reused.
+- `/api/status` reports app identity/version/channel/root so launchers can safely determine whether to reuse or replace an existing companion.
+- Preserves the v0.16.1 session recovery, bounded/scrollable live-loot feed, and startup update notifications.
+- Automatic session expiration based on inactivity remains planned for a later feature release.
+
+## 0.16.2
+
+- Added version-aware tray launching so a stale companion on port 8765 is not silently reused.
+- `/api/status` now reports app identity, version, channel, and application root.
+- On a version mismatch, the launcher requests tray shutdown, waits for the listener to release, and only then starts the intended build.
+- Retains the demo.1 updater handoff fix that waits for both tray and monitor processes before replacing the application folder.
+
+## v0.16.2-demo.1
+
+- Updater hotfix: coordinates shutdown of both the live monitor and system-tray companion before replacing the app folder.
+- Tray PID and update-shutdown request are stored under LocalAppData outside the installation folder.
+- Tray process now runs with TEMP as its working directory and releases the icon file handle.
+- Successful updates and rollbacks restart the full tray launcher.
+
+
+## v0.16.2-demo.1
 - Makes the Recent Loot feed fixed-height and scrollable while keeping a bounded recent-event DOM for performance.
 - Persists the full live-loot session snapshot outside the application folder under LocalAppData.
 - On crash/reboot restart, offers Restore Session or Start New Session.

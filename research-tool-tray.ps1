@@ -7,15 +7,57 @@ $root = [IO.Path]::GetFullPath($Root)
 $monitorScript = Join-Path $root 'live-monitor.ps1'
 $iconPath = Join-Path $root 'EverQuestResearchLoot.ico'
 $toolUrl = 'http://127.0.0.1:8765/index.html'
+$userDataRoot = Join-Path $env:LOCALAPPDATA 'EverQuest Research & Loot Tool'
+if(-not (Test-Path -LiteralPath $userDataRoot)){New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null}
+$trayPidPath = Join-Path $userDataRoot 'tray.pid'
+$shutdownRequestPath = Join-Path $userDataRoot 'shutdown-for-update.request'
+$appVersionPath = Join-Path $root 'app-version.json'
+$expectedVersion = ''
+try {
+    if(Test-Path -LiteralPath $appVersionPath){$expectedVersion=[string]((Get-Content -LiteralPath $appVersionPath -Raw | ConvertFrom-Json).version)}
+} catch {}
+Remove-Item -LiteralPath $shutdownRequestPath -Force -ErrorAction SilentlyContinue
+Set-Content -LiteralPath $trayPidPath -Value ([string]$PID) -Encoding ASCII
 
 if(-not (Test-Path -LiteralPath $monitorScript)){[Windows.Forms.MessageBox]::Show('live-monitor.ps1 was not found. Re-extract the application package.','EverQuest Research & Loot Tool',[Windows.Forms.MessageBoxButtons]::OK,[Windows.Forms.MessageBoxIcon]::Error) | Out-Null; exit 1}
 
-# Reuse an already-running local companion instead of starting a second listener.
+# Reuse the local companion only when it is the same build. If a stale build owns
+# the dedicated port, ask its tray to exit and stop the stale listener before starting.
 $alreadyRunning = $false
+$staleCompanion = $false
 try {
     $r = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8765/api/status' -TimeoutSec 1
-    if($r.StatusCode -eq 200){$alreadyRunning = $true}
+    if($r.StatusCode -eq 200){
+        $status=$null
+        try{$status=$r.Content | ConvertFrom-Json}catch{}
+        $runningVersion=$(if($status -and $status.version){[string]$status.version}else{''})
+        $looksLikeOurApp=$status -and (($status.app -eq 'EverQuest Research & Loot Tool') -or $status.PSObject.Properties.Name -contains 'logFile')
+        if($looksLikeOurApp -and $expectedVersion -and $runningVersion -eq $expectedVersion){
+            $alreadyRunning=$true
+        } elseif($looksLikeOurApp){
+            $staleCompanion=$true
+        }
+    }
 } catch {}
+
+if($staleCompanion){
+    # Newer trays observe this request file. This also safely no-ops for older trays.
+    try{Set-Content -LiteralPath $shutdownRequestPath -Value 'launcher-version-mismatch' -Encoding ASCII}catch{}
+    $deadline=(Get-Date).AddSeconds(5)
+    while((Get-Date) -lt $deadline){
+        Start-Sleep -Milliseconds 250
+        try {
+            $probe=Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8765/api/status' -TimeoutSec 1
+            if($probe.StatusCode -ne 200){break}
+        } catch {break}
+    }
+    # If the stale monitor survived, stop only the process that owns our dedicated port.
+    try {
+        $conn=Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+        if($conn -and $conn.OwningProcess){Stop-Process -Id ([int]$conn.OwningProcess) -Force -ErrorAction SilentlyContinue}
+    } catch {}
+    Start-Sleep -Milliseconds 400
+}
 
 $monitor = $null
 if(-not $alreadyRunning){
@@ -23,7 +65,17 @@ if(-not $alreadyRunning){
 }
 
 $notify = New-Object Windows.Forms.NotifyIcon
-if(Test-Path -LiteralPath $iconPath){$notify.Icon = New-Object Drawing.Icon($iconPath)}else{$notify.Icon=[Drawing.SystemIcons]::Application}
+if(Test-Path -LiteralPath $iconPath){
+    $iconStream=$null;$sourceIcon=$null
+    try{
+        $iconStream=[IO.File]::Open($iconPath,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
+        $sourceIcon=New-Object Drawing.Icon($iconStream)
+        $notify.Icon=$sourceIcon.Clone()
+    } finally {
+        if($sourceIcon){$sourceIcon.Dispose()}
+        if($iconStream){$iconStream.Dispose()}
+    }
+}else{$notify.Icon=[Drawing.SystemIcons]::Application}
 $notify.Text = 'EverQuest Research & Loot Tool'
 $notify.Visible = $true
 
@@ -74,6 +126,13 @@ $exitItem.add_Click({
 $timer = New-Object Windows.Forms.Timer
 $timer.Interval = 1500
 $timer.add_Tick({
+    if(Test-Path -LiteralPath $shutdownRequestPath){
+        Stop-Monitor
+        Remove-Item -LiteralPath $shutdownRequestPath -Force -ErrorAction SilentlyContinue
+        $notify.Visible=$false
+        [Windows.Forms.Application]::Exit()
+        return
+    }
     if(Test-Companion){
         $statusItem.Text='Monitor Status: Online'
         $notify.Text='EverQuest Research & Loot Tool - Online'
@@ -89,4 +148,7 @@ if($alreadyRunning){Open-Tool}
 
 try {[Windows.Forms.Application]::Run()} finally {
     $timer.Stop();$timer.Dispose();$notify.Visible=$false;$notify.Dispose()
+    Remove-Item -LiteralPath $trayPidPath -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $shutdownRequestPath -Force -ErrorAction SilentlyContinue
 }
+

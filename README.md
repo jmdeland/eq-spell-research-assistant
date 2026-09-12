@@ -1,14 +1,14 @@
 # EverQuest Research & Loot Tool by Bromm
 
 
-## v0.16.1
+## v0.16.2 — Updater Hotfix
 - Adds a fixed-height, scrollable Recent Loot feed while preserving the complete session history.
 - Persists live-loot sessions outside the app folder so they can survive crashes, reboots, and updates.
 - Offers Restore Session or Start New Session after an interrupted session.
 - Adds **End Current Loot Session** with saved-event count and confirmation.
 - Adds automatic startup update checks with a non-blocking update notification and Settings badge.
 
-Version **0.16.1**
+Version **0.16.2**
 
 A local Windows companion for Bastion spell Research planning, Magelo inventory mapping, and live EverQuest loot monitoring.
 
