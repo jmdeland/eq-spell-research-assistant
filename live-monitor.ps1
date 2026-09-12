@@ -4,6 +4,9 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $configPath = Join-Path $root "monitor-config.json"
 $syncDataPath = Join-Path $root "data\bastion-synced-recipes.json"
+$userDataRoot = Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"
+if(-not (Test-Path -LiteralPath $userDataRoot)){New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null}
+$sessionStatePath = Join-Path $userDataRoot "session-loot.jsonl"
 
 function Get-Config {
     if (Test-Path $configPath) {
@@ -33,7 +36,7 @@ function Strip-Html([string]$html) {
     return ([regex]::Replace($x,'\s+',' ')).Trim()
 }
 function Invoke-Bastion([string]$url) {
-    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Spell-Research-Assistant/0.15.1-demo.5"}).Content
+    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Research-Loot-Tool/0.16.1"}).Content
 }
 function Parse-RecipePage([int]$id,[string]$html) {
     $plain=Strip-Html $html
@@ -469,7 +472,7 @@ function Convert-VersionCore([string]$version){
     return [version]("{0}.{1}.{2}" -f $parts[0],$parts[1],$parts[2])
 }
 function Get-LatestGitHubRelease {
-    $headers=@{"User-Agent"="EQ-Spell-Research-Assistant/0.15.1-demo.5";"Accept"="application/vnd.github+json"}
+    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.1";"Accept"="application/vnd.github+json"}
     return Invoke-RestMethod -UseBasicParsing -Uri $updateApi -TimeoutSec 45 -Headers $headers
 }
 function Get-UpdateInfo {
@@ -509,7 +512,7 @@ function Download-AndVerifyLatestUpdate {
     $dest=Join-Path $updateStage $info.assetName
     $tmp=$dest+".download"
     if(Test-Path -LiteralPath $tmp){Remove-Item -LiteralPath $tmp -Force}
-    $headers=@{"User-Agent"="EQ-Spell-Research-Assistant/0.15.1-demo.5"}
+    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.1"}
     try{
         Invoke-WebRequest -UseBasicParsing -Uri $info.assetUrl -OutFile $tmp -TimeoutSec 120 -Headers $headers
         $actual=(Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -674,9 +677,39 @@ try {
     return [pscustomobject]@{ok=$true;latestTag=$info.latestTag;backupPath=$backupPath;zipPath=$zipPath;sha256=$actual}
 }
 
+function Read-RequestJson($req) {
+    $reader=New-Object IO.StreamReader($req.InputStream,$req.ContentEncoding)
+    try{$raw=$reader.ReadToEnd()}finally{$reader.Dispose()}
+    if(-not $raw){return $null}
+    return ($raw | ConvertFrom-Json)
+}
+function Get-SessionState {
+    if(-not(Test-Path -LiteralPath $sessionStatePath)){return [pscustomobject]@{ok=$true;hasSession=$false;events=@();savedAt=$null}}
+    try{
+        $rows=New-Object System.Collections.ArrayList
+        $last=$null
+        foreach($line in (Get-Content -LiteralPath $sessionStatePath -ErrorAction Stop)){
+            if(-not [string]::IsNullOrWhiteSpace($line)){
+                try{$evt=$line|ConvertFrom-Json;[void]$rows.Add($evt);if($evt.recordedAt){$last=[string]$evt.recordedAt}}catch{}
+            }
+        }
+        return [pscustomobject]@{ok=$true;hasSession=($rows.Count -gt 0);events=@($rows);savedAt=$last}
+    }catch{return [pscustomobject]@{ok=$false;hasSession=$false;events=@();savedAt=$null;error=$_.Exception.Message}}
+}
+function Append-SessionEvent($evt) {
+    if($null -eq $evt){throw "No session event supplied."}
+    $line=$evt|ConvertTo-Json -Depth 8 -Compress
+    Add-Content -LiteralPath $sessionStatePath -Value $line -Encoding UTF8
+    return [pscustomobject]@{ok=$true;path=$sessionStatePath}
+}
+function Clear-SessionState {
+    if(Test-Path -LiteralPath $sessionStatePath){Remove-Item -LiteralPath $sessionStatePath -Force}
+    return [pscustomobject]@{ok=$true}
+}
+
 $shutdownForUpdate=$false
 $listener=New-Object Net.HttpListener;$prefix="http://127.0.0.1:$port/";$listener.Prefixes.Add($prefix);$listener.Start()
-Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.15.1-demo.13";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
+Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.16.1";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
 Start-Process ($prefix + "index.html")
 
 try{
@@ -686,12 +719,26 @@ while($listener.IsListening){
     while(-not$task.Wait(250)){Read-NewLoot}
     $ctx=$task.Result;$req=$ctx.Request;$res=$ctx.Response
     $res.Headers["Access-Control-Allow-Origin"]="*"
-    $res.Headers["Access-Control-Allow-Methods"]="GET, OPTIONS"
+    $res.Headers["Access-Control-Allow-Methods"]="GET, POST, OPTIONS"
     $res.Headers["Access-Control-Allow-Headers"]="Content-Type"
     if($req.HttpMethod -eq "OPTIONS"){$res.StatusCode=204;$res.OutputStream.Close();continue}
     try{
         $path=$req.Url.AbsolutePath
 
+
+        if($path -eq "/api/session-state"){
+            try{$payload=(Get-SessionState|ConvertTo-Json -Depth 12)}catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
+            $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
+        }
+        if($path -eq "/api/session-event"){
+            try{$evt=Read-RequestJson $req;$payload=(Append-SessionEvent $evt|ConvertTo-Json -Depth 4)}catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
+            $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
+        }
+        if($path -eq "/api/session-clear"){
+
+            try{$payload=(Clear-SessionState|ConvertTo-Json -Depth 4)}catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
+            $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
+        }
 
         if($path -eq "/api/update-state"){
             try{$payload=(Get-UpdateState | ConvertTo-Json -Depth 8)}

@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.16.1
+- Makes the Recent Loot feed fixed-height and scrollable while keeping a bounded recent-event DOM for performance.
+- Persists the full live-loot session snapshot outside the application folder under LocalAppData.
+- On crash/reboot restart, offers Restore Session or Start New Session.
+- Restores full CSV session history, aggregate session loot, provisional owned counts, and recent-feed state.
+- Adds an explicit End / Clear Session control.
+- Automatically checks GitHub stable releases after startup.
+- Shows a non-blocking Update Available toast and a Settings notification dot when a newer stable release exists.
+
 ## v0.16.0
 - Promotes the accepted v0.15.1 demo line to stable production.
 - Live Loot moved to the primary workspace with dynamic ownership-mode explanation and active-log badge.

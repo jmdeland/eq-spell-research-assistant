@@ -9,7 +9,7 @@ function apiUrl(path){
  return onCompanion?path:`${LIVE_COMPANION_ORIGIN}${path}`;
 }
 
-let ACTIVE_DATA=BASTION_DATA,inventory=[],aggregated=[],inventorySources=[],mageloInventory=[],mageloPlacements=[],mageloMeta=null,recipeResults=[],selectedKey=null,liveLootCounts=new Map(),liveOwnedCounts=new Map(),sessionLootEvents=[],previousMageloCounts=null,liveLootFeed=[],liveLastEventId=0,liveEnabled=true,liveAudioCtx=null,liveMonitorOnline=false,corpusSyncInProgress=false,livePollInFlight=false,processedLiveEventIds=new Set();
+let ACTIVE_DATA=BASTION_DATA,inventory=[],aggregated=[],inventorySources=[],mageloInventory=[],mageloPlacements=[],mageloMeta=null,recipeResults=[],selectedKey=null,liveLootCounts=new Map(),liveOwnedCounts=new Map(),sessionLootEvents=[],previousMageloCounts=null,liveLootFeed=[],liveLastEventId=0,liveEnabled=true,liveAudioCtx=null,liveMonitorOnline=false,corpusSyncInProgress=false,livePollInFlight=false,processedLiveEventIds=new Set(),sessionRecoveryPending=true,sessionRecoveryChecked=false,autoUpdateCheckStarted=false;
 const $=s=>document.querySelector(s),norm=s=>(s||"").toLowerCase().replace(/[’']/g,"`").replace(/\s+/g," ").trim();
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 function canonical(s){let n=norm(s);if(n.startsWith("spell: "))n=n.slice(7);return(ACTIVE_DATA.aliases||{})[n]||n}
@@ -455,7 +455,7 @@ function openLootUseModal(entry){
 function closeLootUseModal(){$("#lootUseModal")?.classList.add("hidden");document.body.style.overflow="";}
 function renderLiveFeed(){
  const el=$("#liveLootFeed");if(!el)return;if(!liveLootFeed.length){el.innerHTML='<p class="muted">No live loot yet.</p>';return}
- el.innerHTML=liveLootFeed.slice(0,30).map((x,i)=>{const css=x.value==="HIGH VALUE"?"high":x.value==="KEEP"?"keep":x.value==="OTHER"?"other":"unknown";return `<div class="live-loot-row ${css} clickable" tabindex="0" data-loot-index="${i}" title="${x.uses?"Click to see Research uses":"Click for item details"}"><div class="live-loot-head"><strong>${esc(x.item)}</strong><span class="live-value ${css}">${x.value}</span></div><div class="live-loot-looter">Looted by: ${esc(x.looter||"Unknown")}</div><div class="live-loot-meta">${esc(x.timestamp)}${x.uses?` • ${x.uses} verified use(s)`:""}</div>${x.ambiguous?`<div class="live-ambiguous">Multiple exact item IDs share this name; click to see all possibilities.</div>`:""}</div>`}).join("");
+ el.innerHTML=liveLootFeed.slice(0,60).map((x,i)=>{const css=x.value==="HIGH VALUE"?"high":x.value==="KEEP"?"keep":x.value==="OTHER"?"other":"unknown";return `<div class="live-loot-row ${css} clickable" tabindex="0" data-loot-index="${i}" title="${x.uses?"Click to see Research uses":"Click for item details"}"><div class="live-loot-head"><strong>${esc(x.item)}</strong><span class="live-value ${css}">${x.value}</span></div><div class="live-loot-looter">Looted by: ${esc(x.looter||"Unknown")}</div><div class="live-loot-meta">${esc(x.timestamp)}${x.uses?` • ${x.uses} verified use(s)`:""}</div>${x.ambiguous?`<div class="live-ambiguous">Multiple exact item IDs share this name; click to see all possibilities.</div>`:""}</div>`}).join("");
  document.querySelectorAll(".live-loot-row.clickable").forEach(row=>{const open=()=>openLootUseModal(liveLootFeed[Number(row.dataset.lootIndex)]);row.onclick=open;row.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open()}}});
 }
 function csvCell(v){const s=String(v??"");return /[",\r\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s}
@@ -472,6 +472,7 @@ function exportSessionLoot(){
  a.href=url;a.download=`eq-research-loot-session-${stamp}.csv`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
 }
 function renderLiveSession(){
+ const countEl=$("#savedSessionEventCount");if(countEl){const n=sessionLootEvents.length;countEl.textContent=`${n} event${n===1?"":"s"} saved for recovery`;}
  const el=$("#liveSessionSummary");if(!el)return;
  const rows=[...liveLootCounts.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
  if(!rows.length){el.innerHTML='<p class="muted">Nothing tracked this session.</p>';return}
@@ -486,6 +487,49 @@ function addCraftableAlerts(spells,evt){
  el.innerHTML=cards+el.innerHTML;
  if(liveEnabled&&liveSettings().soundCraftable)beep("craftable");
 }
+async function persistSessionEvent(entry){
+ if(!entry||!liveMonitorOnline)return;
+ try{await fetch(apiUrl("/api/session-event"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(entry),cache:"no-store"})}catch{}
+}
+function applySessionEvents(events){
+ sessionLootEvents=Array.isArray(events)?events:[];
+ liveLootCounts=new Map();liveOwnedCounts=new Map();liveLootFeed=[];
+ for(const e of sessionLootEvents){
+  if(e.tracked===false)continue;
+  const key=canonical(e.item);
+  liveLootCounts.set(key,(liveLootCounts.get(key)||0)+1);
+  if(e.countedAsOwned)liveOwnedCounts.set(key,(liveOwnedCounts.get(key)||0)+1);
+  const value=e.researchValue||"OTHER";
+  liveLootFeed.unshift({item:e.item,looter:e.looter||"Unknown",timestamp:e.timestamp||"",value,uses:Number(e.verifiedUses||0),ambiguous:!!e.ambiguous,ids:String(e.candidateIds||"").split("|").filter(Boolean).map(Number)});
+ }
+ liveLootFeed=liveLootFeed.slice(0,120);
+ evaluate();renderLiveFeed();renderLiveSession();renderSummary();renderList();renderDetail();renderReverseLookup();
+}
+async function clearPersistedSession(){
+ try{await fetch(apiUrl("/api/session-clear"),{method:"POST",cache:"no-store"})}catch{}
+}
+async function clearLootSession({confirmFirst=true}={}){
+ if(confirmFirst&&!confirm("End this loot session? The saved session history and provisional live-loot counts will be cleared."))return;
+ sessionLootEvents=[];liveLootCounts=new Map();liveOwnedCounts=new Map();liveLootFeed=[];processedLiveEventIds.clear();
+ await clearPersistedSession();evaluate();renderLiveFeed();renderLiveSession();renderSummary();renderList();renderDetail();renderReverseLookup();
+}
+async function checkRecoverableSession(){
+ if(sessionRecoveryChecked||!liveMonitorOnline)return;
+ sessionRecoveryChecked=true;
+ try{
+  const r=await fetch(apiUrl("/api/session-state"),{cache:"no-store"}),j=await r.json();
+  const events=Array.isArray(j?.events)?j.events:[];
+  if(j.ok&&j.hasSession&&events.length){
+   const modal=$("#sessionRecoveryModal"),text=$("#sessionRecoveryText");
+   const saved=j.savedAt?new Date(j.savedAt).toLocaleString():"an earlier run";
+   if(text)text.textContent=`${events.length} loot event${events.length===1?"":"s"} saved from ${saved}. Restore them and continue the session, or start fresh.`;
+   modal?.classList.remove("hidden");
+   const restore=$("#restoreLootSession"),fresh=$("#startNewLootSession");
+   if(restore)restore.onclick=()=>{applySessionEvents(events);modal.classList.add("hidden");sessionRecoveryPending=false};
+   if(fresh)fresh.onclick=async()=>{modal.classList.add("hidden");await clearLootSession({confirmFirst:false});sessionRecoveryPending=false};
+  }else sessionRecoveryPending=false;
+ }catch{sessionRecoveryPending=false}
+}
 function processLootEvent(evt,{isReplay=false}={}){
  if(!isReplay&&evt?.id!=null){
   const eventId=Number(evt.id);
@@ -498,22 +542,24 @@ function processLootEvent(evt,{isReplay=false}={}){
  }
  const s=liveSettings();
  const cls=classifyLoot(evt.item);
+ const tracked=s.includeOthers||!!evt.self;
+ const countedAsOwned=(s.ownershipMode==="COUNT")&&tracked;
  if(!isReplay){
-  const countedAsOwned=(s.ownershipMode==="COUNT")&&(s.includeOthers||evt.self);
-  sessionLootEvents.push({
+  const sessionEntry={
    id:evt.id??null,timestamp:evt.timestamp||"",looter:evt.looter||"Unknown",self:!!evt.self,
    item:evt.item||"",researchValue:cls.uses.length?cls.value:(/^words? of |^rune of |grimoire|compendium|memoir|writ|tome|signet|emblem|bolts|card of /i.test(evt.item)?"UNKNOWN":""),
    verifiedUses:cls.uses.length,ambiguous:!!cls.ambiguous,candidateIds:(cls.ids||[]).join("|"),
-   countedAsOwned,ownershipMode:s.ownershipMode
-  });
+   tracked,countedAsOwned,ownershipMode:s.ownershipMode,recordedAt:new Date().toISOString()
+  };
+  sessionLootEvents.push(sessionEntry);persistSessionEvent(sessionEntry);
  }
- if(!s.includeOthers&&!evt.self)return;
+ if(!tracked)return;
  const before=readySpellKeys();
 
  // Always track session loot. Only COUNT mode adds a provisional owned quantity.
  const key=canonical(evt.item);
  liveLootCounts.set(key,(liveLootCounts.get(key)||0)+1);
- if(!isReplay&&s.ownershipMode==="COUNT")liveOwnedCounts.set(key,(liveOwnedCounts.get(key)||0)+1);
+ if(!isReplay&&countedAsOwned)liveOwnedCounts.set(key,(liveOwnedCounts.get(key)||0)+1);
  evaluate();
  const after=readySpellKeys();
  const newly=recipeResults.filter(r=>after.has(r._key)&&!before.has(r._key));
@@ -560,6 +606,9 @@ async function pollLiveMonitor(){
   if($("#liveLogName"))$("#liveLogName").textContent=logName;
   if($("#liveLogBadge"))$("#liveLogBadge").title=`Monitoring ${logName}${sj.character?` for ${sj.character}`:""}`;
   $("#liveMonitorMessage").textContent=`Watching ${logName}${sj.character?` for ${sj.character}`:""}. Loot tracking is active.`;
+  if(!sessionRecoveryChecked)checkRecoverableSession();
+  if(sessionRecoveryPending)return;
+  if(!autoUpdateCheckStarted){autoUpdateCheckStarted=true;setTimeout(autoCheckForUpdates,900)}
 
   const requestSince=liveLastEventId;
   const r=await fetch(apiUrl(`/api/events?since=${requestSince}`),{cache:"no-store"});
@@ -849,6 +898,7 @@ function setupLiveUI(){
  });
  $("#testLiveReplay")?.addEventListener("click",()=>{ensureAudio();replayRecentLoot()});
  $("#exportSessionLoot")?.addEventListener("click",exportSessionLoot);
+ $("#endLootSession")?.addEventListener("click",()=>clearLootSession());
  $("#lootOwnershipMode")?.addEventListener("change",()=>{
   saveLiveSettings();
   const mode=$("#lootOwnershipMode").value;
@@ -987,6 +1037,33 @@ function renderReleaseNotes(info){
  box.innerHTML=`<h3>${esc(info.name||info.tagName||"Release notes")}</h3><pre>${esc(body)}</pre>`;
  box.classList.remove("hidden");
 }
+function setSettingsUpdateIndicator(show){
+ const dot=$("#settingsUpdateDot");if(dot)dot.classList.toggle("hidden",!show);
+}
+function showUpdateToast(info){
+ const toast=$("#updateAvailableToast");if(!toast)return;
+ $("#updateToastTitle").textContent=`Update available: ${info.latestTag}`;
+ $("#updateToastText").textContent=info.name||"A newer stable release is available.";
+ toast.classList.remove("hidden");setSettingsUpdateIndicator(true);
+}
+async function autoCheckForUpdates(){
+ try{
+  if(!liveMonitorOnline)return;
+  const r=await fetch(apiUrl("/api/update-check"),{cache:"no-store"}),j=await r.json();
+  if(!r.ok||!j.ok)return;
+  latestUpdateInfo=j;
+  const latestEl=$("#latestStableVersion");if(latestEl)latestEl.textContent=j.latestTag;
+  if(j.updateAvailable)showUpdateToast(j);else setSettingsUpdateIndicator(false);
+ }catch{}
+}
+function setupUpdateNoticeUI(){
+ $("#dismissAvailableUpdate")?.addEventListener("click",()=>$("#updateAvailableToast")?.classList.add("hidden"));
+ $("#viewAvailableUpdate")?.addEventListener("click",()=>{
+  $("#updateAvailableToast")?.classList.add("hidden");
+  $("#openSettings")?.click();
+  setTimeout(()=>$("#applicationUpdatesSettings")?.scrollIntoView({behavior:"smooth",block:"start"}),120);
+ });
+}
 async function checkForUpdates(){
  const btn=$("#checkForUpdates"),dl=$("#downloadLatestUpdate"),install=$("#installVerifiedUpdate"),link=$("#openReleasePage");
  verifiedUpdateInfo=null;if(install)install.disabled=true;
@@ -1001,10 +1078,12 @@ async function checkForUpdates(){
   if(link&&j.releaseUrl){link.href=j.releaseUrl;link.classList.remove("hidden")}
   renderReleaseNotes(j);
   if(j.updateAvailable){
+   setSettingsUpdateIndicator(true);
    updateBadge("UPDATE AVAILABLE","online");
    setUpdateStatus(`<strong>${esc(j.latestTag)}</strong> is available. Installed: v${esc(j.installedStableVersion)}. Asset: ${esc(j.assetName)}.`);
    if(dl){dl.disabled=false;dl.textContent=`Download & Verify ${j.latestTag}`}
   }else{
+   setSettingsUpdateIndicator(false);
    updateBadge("UP TO DATE","online");
    setUpdateStatus(`You are up to date on the stable channel (${esc(j.latestTag)}).`);
    if(dl){dl.disabled=true;dl.textContent="Download & Verify Update"}
@@ -1077,6 +1156,7 @@ function setupUpdaterUI(){
 }
 
 setupUpdaterUI();
+setupUpdateNoticeUI();
 setupLiveUI();
 setTimeout(loadUpdaterState,1200);
 setTimeout(restoreMagelo,700);
