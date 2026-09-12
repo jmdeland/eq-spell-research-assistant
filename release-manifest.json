@@ -1,9 +1,9 @@
 {
   "schema": 1,
-  "latestVersion": "0.16.0",
-  "tag": "v0.16.0",
-  "assetName": "eq_spell_research_assistant_v0.16.0.zip",
-  "assetUrl": "https://github.com/jmdeland/eq-spell-research-assistant/releases/download/v0.16.0/eq_spell_research_assistant_v0.16.0.zip",
-  "sha256": "050f3d21c80d21cc7502b52948d97a8132b4f39adcaf8668332b483a618f41be",
+  "latestVersion": "0.16.3",
+  "tag": "v0.16.3",
+  "assetName": "eq_spell_research_assistant_v0.16.3.zip",
+  "assetUrl": "",
+  "sha256": "",
   "channel": "stable"
 }

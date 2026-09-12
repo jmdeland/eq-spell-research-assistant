@@ -595,6 +595,8 @@ async function pollLiveMonitor(){
   const status=await fetch(apiUrl("/api/status"),{cache:"no-store"});
   if(!status.ok)throw Error(`status HTTP ${status.status}`);
   const sj=await status.json();
+  const installedVersionEl=$("#installedAppVersion");
+  if(installedVersionEl&&sj.version)installedVersionEl.textContent=`v${sj.version}`;
   if(Number(sj.lastEventId||0)<liveLastEventId){
    liveLastEventId=0;
    processedLiveEventIds.clear();
@@ -1052,6 +1054,7 @@ async function autoCheckForUpdates(){
   const r=await fetch(apiUrl("/api/update-check"),{cache:"no-store"}),j=await r.json();
   if(!r.ok||!j.ok)return;
   latestUpdateInfo=j;
+  const installedEl=$("#installedAppVersion");if(installedEl&&j.installedVersion)installedEl.textContent=`v${j.installedVersion}`;
   const latestEl=$("#latestStableVersion");if(latestEl)latestEl.textContent=j.latestTag;
   if(j.updateAvailable)showUpdateToast(j);else setSettingsUpdateIndicator(false);
  }catch{}
@@ -1074,7 +1077,9 @@ async function checkForUpdates(){
   if(!liveMonitorOnline)throw Error("Start START-LIVE-MONITOR.bat first. Update checks run through the local companion.");
   const r=await fetch(apiUrl("/api/update-check"),{cache:"no-store"}),j=await r.json();
   if(!r.ok||!j.ok)throw Error(j.error||`HTTP ${r.status}`);
-  latestUpdateInfo=j;const cmp=compareStableVersions(j.latestVersion,j.installedStableVersion);const latestEl=$("#latestStableVersion");if(latestEl)latestEl.textContent=j.latestTag;
+  latestUpdateInfo=j;const cmp=compareStableVersions(j.latestVersion,j.installedStableVersion);
+  const installedEl=$("#installedAppVersion");if(installedEl&&j.installedVersion)installedEl.textContent=`v${j.installedVersion}`;
+  const latestEl=$("#latestStableVersion");if(latestEl)latestEl.textContent=j.latestTag;
   if(link&&j.releaseUrl){link.href=j.releaseUrl;link.classList.remove("hidden")}
   renderReleaseNotes(j);
   if(j.updateAvailable){
@@ -1085,7 +1090,11 @@ async function checkForUpdates(){
   }else{
    setSettingsUpdateIndicator(false);
    updateBadge("UP TO DATE","online");
-   setUpdateStatus(`You are up to date on the stable channel (${esc(j.latestTag)}).`);
+   if(String(j.channel||"").toLowerCase()!=="stable"){
+    setUpdateStatus(`Running <strong>v${esc(j.installedVersion)}</strong> (${esc(j.channel||"demo")}). Its stable base is v${esc(j.installedStableVersion)}, which matches the latest stable release (${esc(j.latestTag)}). No stable upgrade is available.`);
+   }else{
+    setUpdateStatus(`You are up to date on the stable channel (${esc(j.latestTag)}).`);
+   }
    if(dl){dl.disabled=true;dl.textContent="Download & Verify Update"}
   }
  }catch(e){latestUpdateInfo=null;updateBadge("CHECK FAILED","offline");setUpdateStatus(`<span class="update-error">Update check failed: ${esc(e.message)}</span>`)}

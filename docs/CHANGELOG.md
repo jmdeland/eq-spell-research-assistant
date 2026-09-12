@@ -1,5 +1,56 @@
 # Changelog
 
+## v0.16.3
+
+- Enforces a single system-tray process to prevent duplicate tray instances.
+- Makes the tray launcher the only component responsible for opening the browser.
+- Prevents repeated browser tabs during startup and restored-session workflows.
+- Starting the shortcut while the same build is already running opens the tool without creating another tray.
+- Update and rollback restarts suppress automatic browser opening once, preserving the existing browser tab.
+- Removes `cmd.exe` from updater and rollback restart paths; restarts now launch directly through `wscript.exe`.
+- Fixes the Application Updates screen so the installed version reflects the actual running build.
+- Moves launcher/shortcut working directories away from the application folder to reduce file-lock risk.
+- Refreshes release-manifest metadata.
+- Preserves v0.16.2 updater coordination, session recovery, Live Loot behavior, Bastion data, and inventory logic.
+
+## v0.16.3-demo.4
+
+- Removes `cmd.exe` entirely from updater and rollback restart paths.
+- Successful updates now restart the hidden application launcher directly with `wscript.exe`.
+- Rollback restarts use the same direct `wscript.exe` path.
+- Avoids the `cmd.exe - Application Error (0xc0000142)` seen after update installation.
+- Retains demo.3 truthful installed-version display.
+- Retains demo.2 browser-flood fix and demo.1 single-tray behavior.
+- No Research, inventory, Bastion sync, or session data behavior changed.
+
+## v0.16.3-demo.3
+
+- Fixes the Application Updates screen showing a hardcoded `v0.16.0` installed version.
+- Installed version now comes from the running local companion and update API.
+- Demo builds now clearly explain when their stable base already matches the latest stable release.
+- Retains the demo.2 fix preventing repeated browser tabs during session restore/startup.
+- No Research, inventory, Bastion sync, or session data behavior changed.
+
+## v0.16.3-demo.2
+
+- Fixes repeated browser tabs caused by the tray timer's browser-open guard using event-handler-local scope.
+- The initial browser-open flag is now explicitly script-scoped, so the automatic launch can occur only once per tray session.
+- Session Restore itself does not open or reload the browser.
+- Retains all v0.16.3-demo.1 single-tray and updater browser-suppression changes.
+
+## v0.16.3-demo.1
+
+- Enforces a single system-tray process to prevent duplicate tray instances.
+- Makes the tray launcher the only component responsible for opening the browser.
+- The live monitor no longer launches a browser window itself.
+- Normal startup opens the tool exactly once after the companion becomes available.
+- Starting the shortcut while the same build is already running opens the tool without creating another tray.
+- Update and rollback restarts suppress the automatic browser open once, leaving the existing browser tab in place.
+- Desktop shortcut working directory is `%TEMP%`, not the application folder.
+- `START-RESEARCH-TOOL.bat` no longer changes into the application directory.
+- Refreshes stale release-manifest metadata.
+- No Research, Bastion data, inventory, or session-recovery behavior changed.
+
 ## v0.16.2
 
 - Hotfixes the self-updater so the system-tray companion and live monitor both release the application folder before replacement.

@@ -11,15 +11,37 @@ $userDataRoot = Join-Path $env:LOCALAPPDATA 'EverQuest Research & Loot Tool'
 if(-not (Test-Path -LiteralPath $userDataRoot)){New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null}
 $trayPidPath = Join-Path $userDataRoot 'tray.pid'
 $shutdownRequestPath = Join-Path $userDataRoot 'shutdown-for-update.request'
+$suppressBrowserPath = Join-Path $userDataRoot 'suppress-browser-once.request'
+$mutex = New-Object Threading.Mutex($false,'Local\EverQuestResearchLootToolTray')
+$ownsMutex = $false
 $appVersionPath = Join-Path $root 'app-version.json'
 $expectedVersion = ''
 try {
     if(Test-Path -LiteralPath $appVersionPath){$expectedVersion=[string]((Get-Content -LiteralPath $appVersionPath -Raw | ConvertFrom-Json).version)}
 } catch {}
 Remove-Item -LiteralPath $shutdownRequestPath -Force -ErrorAction SilentlyContinue
-Set-Content -LiteralPath $trayPidPath -Value ([string]$PID) -Encoding ASCII
 
 if(-not (Test-Path -LiteralPath $monitorScript)){[Windows.Forms.MessageBox]::Show('live-monitor.ps1 was not found. Re-extract the application package.','EverQuest Research & Loot Tool',[Windows.Forms.MessageBoxButtons]::OK,[Windows.Forms.MessageBoxIcon]::Error) | Out-Null; exit 1}
+
+# If this exact build is already online, act like an Open command and exit.
+try {
+    $existing = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8765/api/status' -TimeoutSec 1
+    if($existing.StatusCode -eq 200){
+        $existingStatus=$null
+        try{$existingStatus=$existing.Content | ConvertFrom-Json}catch{}
+        $existingVersion=$(if($existingStatus -and $existingStatus.version){[string]$existingStatus.version}else{''})
+        $existingLooksLikeUs=$existingStatus -and (($existingStatus.app -eq 'EverQuest Research & Loot Tool') -or $existingStatus.PSObject.Properties.Name -contains 'logFile')
+        if($existingLooksLikeUs -and $expectedVersion -and $existingVersion -eq $expectedVersion){
+            Start-Process $toolUrl
+            exit 0
+        }
+    }
+} catch {}
+
+# Enforce exactly one tray process. A second launch exits before creating another tray.
+try{$ownsMutex=$mutex.WaitOne(0,$false)}catch{$ownsMutex=$false}
+if(-not $ownsMutex){exit 0}
+Set-Content -LiteralPath $trayPidPath -Value ([string]$PID) -Encoding ASCII
 
 # Reuse the local companion only when it is the same build. If a stale build owns
 # the dedicated port, ask its tray to exit and stop the stale listener before starting.
@@ -105,6 +127,10 @@ function Stop-Monitor {
     }
 }
 
+$suppressInitialBrowser = Test-Path -LiteralPath $suppressBrowserPath
+if($suppressInitialBrowser){Remove-Item -LiteralPath $suppressBrowserPath -Force -ErrorAction SilentlyContinue}
+$script:initialBrowserHandled = $suppressInitialBrowser
+
 $openItem.add_Click({Open-Tool})
 $notify.add_DoubleClick({Open-Tool})
 $restartItem.add_Click({
@@ -136,6 +162,10 @@ $timer.add_Tick({
     if(Test-Companion){
         $statusItem.Text='Monitor Status: Online'
         $notify.Text='EverQuest Research & Loot Tool - Online'
+        if(-not $script:initialBrowserHandled){
+            $script:initialBrowserHandled=$true
+            Open-Tool
+        }
     } else {
         $statusItem.Text='Monitor Status: Offline'
         $notify.Text='EverQuest Research & Loot Tool - Offline'
@@ -143,12 +173,12 @@ $timer.add_Tick({
 })
 $timer.Start()
 
-# The live monitor normally opens the browser itself. If reusing an existing companion, open it here.
-if($alreadyRunning){Open-Tool}
 
 try {[Windows.Forms.Application]::Run()} finally {
     $timer.Stop();$timer.Dispose();$notify.Visible=$false;$notify.Dispose()
     Remove-Item -LiteralPath $trayPidPath -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $shutdownRequestPath -Force -ErrorAction SilentlyContinue
+    if($ownsMutex){try{$mutex.ReleaseMutex()}catch{}}
+    if($mutex){$mutex.Dispose()}
 }
 

@@ -10,7 +10,7 @@ $ws=New-Object -ComObject WScript.Shell
 $sc=$ws.CreateShortcut($shortcutPath)
 $sc.TargetPath=$wscript
 $sc.Arguments='"'+$vbs+'"'
-$sc.WorkingDirectory=$root
+$sc.WorkingDirectory=$env:TEMP
 $sc.IconLocation=$icon+',0'
 $sc.Description='Launch EverQuest Research & Loot Tool'
 $sc.Save()

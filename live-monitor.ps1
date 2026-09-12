@@ -9,6 +9,7 @@ if(-not (Test-Path -LiteralPath $userDataRoot)){New-Item -ItemType Directory -Pa
 $sessionStatePath = Join-Path $userDataRoot "session-loot.jsonl"
 $trayPidPath = Join-Path $userDataRoot "tray.pid"
 $shutdownRequestPath = Join-Path $userDataRoot "shutdown-for-update.request"
+$suppressBrowserPath = Join-Path $userDataRoot "suppress-browser-once.request"
 
 function Get-Config {
     if (Test-Path $configPath) {
@@ -38,7 +39,7 @@ function Strip-Html([string]$html) {
     return ([regex]::Replace($x,'\s+',' ')).Trim()
 }
 function Invoke-Bastion([string]$url) {
-    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Research-Loot-Tool/0.16.2"}).Content
+    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Research-Loot-Tool/0.16.3"}).Content
 }
 function Parse-RecipePage([int]$id,[string]$html) {
     $plain=Strip-Html $html
@@ -474,7 +475,7 @@ function Convert-VersionCore([string]$version){
     return [version]("{0}.{1}.{2}" -f $parts[0],$parts[1],$parts[2])
 }
 function Get-LatestGitHubRelease {
-    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.2";"Accept"="application/vnd.github+json"}
+    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.3";"Accept"="application/vnd.github+json"}
     return Invoke-RestMethod -UseBasicParsing -Uri $updateApi -TimeoutSec 45 -Headers $headers
 }
 function Get-UpdateInfo {
@@ -514,7 +515,7 @@ function Download-AndVerifyLatestUpdate {
     $dest=Join-Path $updateStage $info.assetName
     $tmp=$dest+".download"
     if(Test-Path -LiteralPath $tmp){Remove-Item -LiteralPath $tmp -Force}
-    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.2"}
+    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.3"}
     try{
         Invoke-WebRequest -UseBasicParsing -Uri $info.assetUrl -OutFile $tmp -TimeoutSec 120 -Headers $headers
         $actual=(Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -583,6 +584,9 @@ $ErrorActionPreference="Stop"
 $work=Join-Path $env:TEMP ("EQSpellResearchInstall_" + [guid]::NewGuid().ToString("N"))
 $backupMade=$false
 $logPath=$BackupPath + ".updater.log"
+$userDataRoot=Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"
+if(-not(Test-Path -LiteralPath $userDataRoot)){New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null}
+$suppressBrowserPath=Join-Path $userDataRoot "suppress-browser-once.request"
 function Write-UpdaterLog([string]$Message){
     try{Add-Content -LiteralPath $logPath -Value ((Get-Date).ToString("o") + " " + $Message) -Encoding UTF8}catch{}
 }
@@ -645,10 +649,12 @@ try {
         }
     } catch { Write-UpdaterLog ("Backup retention warning: " + $_.Exception.Message) }
 
-    $bat=Join-Path $Root "START-RESEARCH-TOOL.bat"
-    $restartCommand='start "" "{0}"' -f $bat
-    Write-UpdaterLog "Install completed. Restarting application."
-    Start-Process -FilePath "cmd.exe" -ArgumentList @("/c",$restartCommand) -WorkingDirectory $Root
+    $vbs=Join-Path $Root "EverQuest Research & Loot Tool.vbs"
+    $wscript=Join-Path $env:WINDIR "System32\wscript.exe"
+    Set-Content -LiteralPath $suppressBrowserPath -Value ((Get-Date).ToString("o")) -Encoding ASCII
+    Write-UpdaterLog "Install completed. Restarting application directly through wscript.exe without cmd.exe."
+    if(-not(Test-Path -LiteralPath $vbs)){throw "Updated VBS launcher was not found."}
+    Start-Process -FilePath $wscript -ArgumentList @(('"{0}"' -f $vbs)) -WorkingDirectory $env:TEMP
 } catch {
     $message=$_.Exception.Message
     Write-UpdaterLog ("INSTALL FAILED: " + $message)
@@ -661,10 +667,11 @@ try {
         $err=[pscustomobject]@{ok=$false;error=$message;failedAt=(Get-Date).ToString("o")} | ConvertTo-Json -Depth 4
         if(Test-Path -LiteralPath $Root){
             $err | Set-Content -LiteralPath (Join-Path $Root "update-result.json") -Encoding UTF8
-            $rollbackBat=Join-Path $Root "START-RESEARCH-TOOL.bat"
-            if(Test-Path -LiteralPath $rollbackBat){
-                $rollbackCommand='start "" "{0}"' -f $rollbackBat
-                Start-Process -FilePath "cmd.exe" -ArgumentList @("/c",$rollbackCommand) -WorkingDirectory $Root
+            $rollbackVbs=Join-Path $Root "EverQuest Research & Loot Tool.vbs"
+            if(Test-Path -LiteralPath $rollbackVbs){
+                $wscript=Join-Path $env:WINDIR "System32\wscript.exe"
+                Set-Content -LiteralPath $suppressBrowserPath -Value ((Get-Date).ToString("o")) -Encoding ASCII
+                Start-Process -FilePath $wscript -ArgumentList @(('"{0}"' -f $rollbackVbs)) -WorkingDirectory $env:TEMP
             }
         }
     } catch { Write-UpdaterLog ("ROLLBACK ERROR: " + $_.Exception.Message) }
@@ -688,6 +695,7 @@ try {
     Start-Process powershell.exe -WindowStyle Normal -WorkingDirectory $env:TEMP -ArgumentList $updaterArgs
     return [pscustomobject]@{ok=$true;latestTag=$info.latestTag;backupPath=$backupPath;zipPath=$zipPath;sha256=$actual;trayPid=$trayPidToWait}
 }
+
 
 function Read-RequestJson($req) {
     $reader=New-Object IO.StreamReader($req.InputStream,$req.ContentEncoding)
@@ -721,8 +729,7 @@ function Clear-SessionState {
 
 $shutdownForUpdate=$false
 $listener=New-Object Net.HttpListener;$prefix="http://127.0.0.1:$port/";$listener.Prefixes.Add($prefix);$listener.Start()
-Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.16.2";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
-Start-Process ($prefix + "index.html")
+Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.16.3";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
 
 try{
 while($listener.IsListening){

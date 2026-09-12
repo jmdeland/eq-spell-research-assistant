@@ -1,7 +1,7 @@
 # EverQuest Research & Loot Tool by Bromm
 
 
-## v0.16.2 — Updater Hotfix
+## v0.16.3 — Updater Hotfix
 - Adds a fixed-height, scrollable Recent Loot feed while preserving the complete session history.
 - Persists live-loot sessions outside the app folder so they can survive crashes, reboots, and updates.
 - Offers Restore Session or Start New Session after an interrupted session.
