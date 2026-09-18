@@ -487,9 +487,33 @@ function addCraftableAlerts(spells,evt){
  el.innerHTML=cards+el.innerHTML;
  if(liveEnabled&&liveSettings().soundCraftable)beep("craftable");
 }
-async function persistSessionEvent(entry){
+let pendingSessionPersist=[],sessionPersistTimer=null,sessionPersistPromise=null;
+function queueSessionEvent(entry){
  if(!entry||!liveMonitorOnline)return;
- try{await fetch(apiUrl("/api/session-event"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(entry),cache:"no-store"})}catch{}
+ pendingSessionPersist.push(entry);
+ if(!sessionPersistTimer)sessionPersistTimer=setTimeout(()=>{sessionPersistTimer=null;flushSessionPersistQueue()},150);
+}
+async function flushSessionPersistQueue(){
+ if(sessionPersistPromise||!pendingSessionPersist.length||!liveMonitorOnline)return sessionPersistPromise;
+ const batch=pendingSessionPersist.splice(0,100);
+ sessionPersistPromise=(async()=>{
+  try{
+   const r=await fetch(apiUrl("/api/session-events"),{
+    method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({events:batch}),cache:"no-store"
+   });
+   let j=null;try{j=await r.json()}catch{}
+   if(!r.ok||!j?.ok)throw Error(j?.error||`session-events HTTP ${r.status}`);
+  }catch(e){
+   pendingSessionPersist.unshift(...batch);
+  }finally{
+   sessionPersistPromise=null;
+   if(pendingSessionPersist.length&&!sessionPersistTimer){
+    sessionPersistTimer=setTimeout(()=>{sessionPersistTimer=null;flushSessionPersistQueue()},250);
+   }
+  }
+ })();
+ return sessionPersistPromise;
 }
 function applySessionEvents(events){
  sessionLootEvents=Array.isArray(events)?events:[];
@@ -506,12 +530,27 @@ function applySessionEvents(events){
  evaluate();renderLiveFeed();renderLiveSession();renderSummary();renderList();renderDetail();renderReverseLookup();
 }
 async function clearPersistedSession(){
- try{await fetch(apiUrl("/api/session-clear"),{method:"POST",cache:"no-store"})}catch{}
+ const r=await fetch(apiUrl("/api/session-clear"),{method:"POST",cache:"no-store"});
+ let j=null;try{j=await r.json()}catch{}
+ if(!r.ok||!j?.ok)throw Error(j?.error||`session-clear HTTP ${r.status}`);
+ return j;
 }
 async function clearLootSession({confirmFirst=true}={}){
- if(confirmFirst&&!confirm("End this loot session? The saved session history and provisional live-loot counts will be cleared."))return;
- sessionLootEvents=[];liveLootCounts=new Map();liveOwnedCounts=new Map();liveLootFeed=[];processedLiveEventIds.clear();
- await clearPersistedSession();evaluate();renderLiveFeed();renderLiveSession();renderSummary();renderList();renderDetail();renderReverseLookup();
+ if(confirmFirst&&!confirm("End this loot session? The saved session history and provisional live-loot counts will be cleared."))return false;
+ try{
+  if(sessionPersistTimer){clearTimeout(sessionPersistTimer);sessionPersistTimer=null}
+  pendingSessionPersist=[];
+  if(sessionPersistPromise){try{await sessionPersistPromise}catch{}}
+  pendingSessionPersist=[];
+  await clearPersistedSession();
+  sessionLootEvents=[];liveLootCounts=new Map();liveOwnedCounts=new Map();liveLootFeed=[];processedLiveEventIds.clear();
+  liveLastEventId=0;
+  evaluate();renderLiveFeed();renderLiveSession();renderSummary();renderList();renderDetail();renderReverseLookup();
+  return true;
+ }catch(e){
+  alert(`Could not end the loot session: ${e.message}`);
+  return false;
+ }
 }
 async function checkRecoverableSession(){
  if(sessionRecoveryChecked||!liveMonitorOnline)return;
@@ -526,14 +565,17 @@ async function checkRecoverableSession(){
    modal?.classList.remove("hidden");
    const restore=$("#restoreLootSession"),fresh=$("#startNewLootSession");
    if(restore)restore.onclick=()=>{applySessionEvents(events);modal.classList.add("hidden");sessionRecoveryPending=false};
-   if(fresh)fresh.onclick=async()=>{modal.classList.add("hidden");await clearLootSession({confirmFirst:false});sessionRecoveryPending=false};
+   if(fresh)fresh.onclick=async()=>{
+    const ok=await clearLootSession({confirmFirst:false});
+    if(ok){modal.classList.add("hidden");sessionRecoveryPending=false}
+   };
   }else sessionRecoveryPending=false;
  }catch{sessionRecoveryPending=false}
 }
-function processLootEvent(evt,{isReplay=false}={}){
+function processLootEvent(evt,{isReplay=false,deferRender=false}={}){
  if(!isReplay&&evt?.id!=null){
   const eventId=Number(evt.id);
-  if(processedLiveEventIds.has(eventId))return false;
+  if(processedLiveEventIds.has(eventId))return {processed:false,recipeChanged:false};
   processedLiveEventIds.add(eventId);
   if(processedLiveEventIds.size>5000){
    const keep=[...processedLiveEventIds].sort((a,b)=>b-a).slice(0,2500);
@@ -551,34 +593,46 @@ function processLootEvent(evt,{isReplay=false}={}){
    verifiedUses:cls.uses.length,ambiguous:!!cls.ambiguous,candidateIds:(cls.ids||[]).join("|"),
    tracked,countedAsOwned,ownershipMode:s.ownershipMode,recordedAt:new Date().toISOString()
   };
-  sessionLootEvents.push(sessionEntry);persistSessionEvent(sessionEntry);
+  sessionLootEvents.push(sessionEntry);queueSessionEvent(sessionEntry);
  }
- if(!tracked)return;
- const before=readySpellKeys();
+ if(!tracked)return {processed:true,recipeChanged:false};
 
- // Always track session loot. Only COUNT mode adds a provisional owned quantity.
+ // Ordinary/unmapped loot cannot affect recipe readiness. Avoid the expensive
+ // recipe recalculation for those events.
+ const affectsRecipes=cls.uses.length>0;
+ const before=affectsRecipes?readySpellKeys():null;
+
  const key=canonical(evt.item);
  liveLootCounts.set(key,(liveLootCounts.get(key)||0)+1);
  if(!isReplay&&countedAsOwned)liveOwnedCounts.set(key,(liveOwnedCounts.get(key)||0)+1);
- evaluate();
- const after=readySpellKeys();
- const newly=recipeResults.filter(r=>after.has(r._key)&&!before.has(r._key));
+
+ let newly=[];
+ if(affectsRecipes){
+  evaluate();
+  const after=readySpellKeys();
+  newly=recipeResults.filter(r=>after.has(r._key)&&!before.has(r._key));
+ }
 
  if(cls.uses.length){
   liveLootFeed.unshift({item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",value:cls.value,uses:cls.uses.length,ambiguous:cls.ambiguous,ids:cls.ids});
   if(liveEnabled){if(cls.value==="HIGH VALUE"&&s.soundHigh)beep("high");else if(s.soundAny)beep("research");}
  }else if(isReplay){
   // Replay intentionally includes only relevant items in the visible feed.
- } else {
-  // Keep every observed loot event in the visible live log so the looter is always visible.
-  // Research-like but currently unmapped items remain UNKNOWN; ordinary loot is marked OTHER.
+ }else{
   const researchLooking=/^words? of |^rune of |grimoire|compendium|memoir|writ|tome|signet|emblem|bolts|card of /i.test(evt.item);
   liveLootFeed.unshift({item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",value:researchLooking?"UNKNOWN":"OTHER",uses:0,ambiguous:false,ids:[]});
  }
- renderLiveFeed();renderLiveSession();renderSummary();renderList();renderDetail();renderReverseLookup();
+ if(liveLootFeed.length>120)liveLootFeed.length=120;
+
  if(newly.length)addCraftableAlerts(newly,evt);
- return true;
+
+ if(!deferRender){
+  renderLiveFeed();renderLiveSession();
+  if(affectsRecipes){renderSummary();renderList();renderDetail();renderReverseLookup();}
+ }
+ return {processed:true,recipeChanged:affectsRecipes};
 }
+
 function liveOwnershipSummaryText(mode){
  return mode==="COUNT"?
   "Group/personal mode: tracked loot counts provisionally until Magelo confirms it.":
@@ -622,10 +676,16 @@ async function pollLiveMonitor(){
   // poll is triggered later it cannot request this same event batch again.
   liveLastEventId=Math.max(liveLastEventId,Number(j.lastEventId||0));
 
+  let processedAny=false,recipeChanged=false;
   for(const e of events){
    if(e?.id!=null&&Number(e.id)<=requestSince)continue;
-   processLootEvent(e);
+   const result=processLootEvent(e,{deferRender:true});
+   if(result?.processed)processedAny=true;
+   if(result?.recipeChanged)recipeChanged=true;
   }
+  if(processedAny){renderLiveFeed();renderLiveSession();}
+  if(recipeChanged){renderSummary();renderList();renderDetail();renderReverseLookup();}
+  if(pendingSessionPersist.length)flushSessionPersistQueue();
  }catch(e){
   if(corpusSyncInProgress){
    if($("#liveStatus")){$("#liveStatus").textContent="SYNCING";$("#liveStatus").className="live-status online"}

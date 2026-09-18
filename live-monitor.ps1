@@ -39,7 +39,7 @@ function Strip-Html([string]$html) {
     return ([regex]::Replace($x,'\s+',' ')).Trim()
 }
 function Invoke-Bastion([string]$url) {
-    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Research-Loot-Tool/0.16.3"}).Content
+    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Research-Loot-Tool/0.16.4"}).Content
 }
 function Parse-RecipePage([int]$id,[string]$html) {
     $plain=Strip-Html $html
@@ -475,7 +475,7 @@ function Convert-VersionCore([string]$version){
     return [version]("{0}.{1}.{2}" -f $parts[0],$parts[1],$parts[2])
 }
 function Get-LatestGitHubRelease {
-    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.3";"Accept"="application/vnd.github+json"}
+    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.4";"Accept"="application/vnd.github+json"}
     return Invoke-RestMethod -UseBasicParsing -Uri $updateApi -TimeoutSec 45 -Headers $headers
 }
 function Get-UpdateInfo {
@@ -515,7 +515,7 @@ function Download-AndVerifyLatestUpdate {
     $dest=Join-Path $updateStage $info.assetName
     $tmp=$dest+".download"
     if(Test-Path -LiteralPath $tmp){Remove-Item -LiteralPath $tmp -Force}
-    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.3"}
+    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.4"}
     try{
         Invoke-WebRequest -UseBasicParsing -Uri $info.assetUrl -OutFile $tmp -TimeoutSec 120 -Headers $headers
         $actual=(Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -649,6 +649,29 @@ try {
         }
     } catch { Write-UpdaterLog ("Backup retention warning: " + $_.Exception.Message) }
 
+    # Rebuild the normal desktop shortcut so it always points at the newly
+    # installed application root rather than an older extracted copy.
+    try {
+        $desktop=[Environment]::GetFolderPath('Desktop')
+        $shortcutPath=Join-Path $desktop 'EverQuest Research & Loot Tool.lnk'
+        $vbs=Join-Path $Root 'EverQuest Research & Loot Tool.vbs'
+        $icon=Join-Path $Root 'EverQuestResearchLoot.ico'
+        $wscript=Join-Path $env:WINDIR 'System32\wscript.exe'
+        if(Test-Path -LiteralPath $shortcutPath){Remove-Item -LiteralPath $shortcutPath -Force -ErrorAction SilentlyContinue}
+        $ws=New-Object -ComObject WScript.Shell
+        $sc=$ws.CreateShortcut($shortcutPath)
+        $sc.TargetPath=$wscript
+        $sc.Arguments='"'+$vbs+'"'
+        $sc.WorkingDirectory=$env:TEMP
+        $sc.IconLocation=$icon+',0'
+        $sc.Description='Launch EverQuest Research & Loot Tool'
+        $sc.Save()
+        Set-Content -LiteralPath (Join-Path $userDataRoot 'install-root.txt') -Value $Root -Encoding UTF8
+        Write-UpdaterLog ("Desktop shortcut refreshed to: " + $vbs)
+    } catch {
+        Write-UpdaterLog ("Desktop shortcut refresh warning: " + $_.Exception.Message)
+    }
+
     $vbs=Join-Path $Root "EverQuest Research & Loot Tool.vbs"
     $wscript=Join-Path $env:WINDIR "System32\wscript.exe"
     Set-Content -LiteralPath $suppressBrowserPath -Value ((Get-Date).ToString("o")) -Encoding ASCII
@@ -692,7 +715,7 @@ try {
         "-WaitForTrayPid",$trayPidToWait,
         "-LatestTag",('"{0}"' -f $info.latestTag)
     )
-    Start-Process powershell.exe -WindowStyle Normal -WorkingDirectory $env:TEMP -ArgumentList $updaterArgs
+    Start-Process powershell.exe -WindowStyle Hidden -WorkingDirectory $env:TEMP -ArgumentList $updaterArgs
     return [pscustomobject]@{ok=$true;latestTag=$info.latestTag;backupPath=$backupPath;zipPath=$zipPath;sha256=$actual;trayPid=$trayPidToWait}
 }
 
@@ -722,14 +745,29 @@ function Append-SessionEvent($evt) {
     Add-Content -LiteralPath $sessionStatePath -Value $line -Encoding UTF8
     return [pscustomobject]@{ok=$true;path=$sessionStatePath}
 }
+function Append-SessionEvents($items) {
+    $batch=@($items)
+    if($batch.Count -eq 0){return [pscustomobject]@{ok=$true;count=0;path=$sessionStatePath}}
+    $lines=New-Object System.Collections.Generic.List[string]
+    foreach($evt in $batch){
+        if($null -eq $evt){continue}
+        $lines.Add(($evt|ConvertTo-Json -Depth 8 -Compress))
+    }
+    if($lines.Count -gt 0){Add-Content -LiteralPath $sessionStatePath -Value $lines.ToArray() -Encoding UTF8}
+    return [pscustomobject]@{ok=$true;count=$lines.Count;path=$sessionStatePath}
+}
 function Clear-SessionState {
     if(Test-Path -LiteralPath $sessionStatePath){Remove-Item -LiteralPath $sessionStatePath -Force}
-    return [pscustomobject]@{ok=$true}
+    # Starting a new loot session means "from now forward". Clear events already
+    # buffered by this running monitor so they cannot be replayed into the new session.
+    $clearedBufferedEvents=$events.Count
+    $events.Clear()
+    return [pscustomobject]@{ok=$true;clearedBufferedEvents=$clearedBufferedEvents;nextEventId=$nextId}
 }
 
 $shutdownForUpdate=$false
 $listener=New-Object Net.HttpListener;$prefix="http://127.0.0.1:$port/";$listener.Prefixes.Add($prefix);$listener.Start()
-Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.16.3";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
+Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.16.4";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
 
 try{
 while($listener.IsListening){
@@ -751,6 +789,15 @@ while($listener.IsListening){
         }
         if($path -eq "/api/session-event"){
             try{$evt=Read-RequestJson $req;$payload=(Append-SessionEvent $evt|ConvertTo-Json -Depth 4)}catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
+            $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
+        }
+        if($path -eq "/api/session-events"){
+            try{
+                $body=Read-RequestJson $req
+                $items=@()
+                if($body -and $body.events){$items=@($body.events)}
+                $payload=(Append-SessionEvents $items|ConvertTo-Json -Depth 4)
+            }catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
             $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
         }
         if($path -eq "/api/session-clear"){

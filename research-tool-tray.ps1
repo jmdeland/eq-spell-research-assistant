@@ -4,6 +4,48 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $root = [IO.Path]::GetFullPath($Root)
+function Repair-DesktopShortcut {
+    try {
+        $desktop=[Environment]::GetFolderPath('Desktop')
+        if(-not $desktop){return}
+        $shortcutPath=Join-Path $desktop 'EverQuest Research & Loot Tool.lnk'
+        $vbs=Join-Path $root 'EverQuest Research & Loot Tool.vbs'
+        $icon=Join-Path $root 'EverQuestResearchLoot.ico'
+        $wscript=Join-Path $env:WINDIR 'System32\wscript.exe'
+        if(-not(Test-Path -LiteralPath $vbs)){return}
+
+        $needsRepair=$true
+        if(Test-Path -LiteralPath $shortcutPath){
+            try {
+                $ws=New-Object -ComObject WScript.Shell
+                $existing=$ws.CreateShortcut($shortcutPath)
+                $expectedArgs='"'+$vbs+'"'
+                if($existing.TargetPath -eq $wscript -and $existing.Arguments -eq $expectedArgs){
+                    $needsRepair=$false
+                }
+            } catch {}
+        }
+
+        if($needsRepair){
+            if(Test-Path -LiteralPath $shortcutPath){Remove-Item -LiteralPath $shortcutPath -Force -ErrorAction SilentlyContinue}
+            $ws=New-Object -ComObject WScript.Shell
+            $sc=$ws.CreateShortcut($shortcutPath)
+            $sc.TargetPath=$wscript
+            $sc.Arguments='"'+$vbs+'"'
+            $sc.WorkingDirectory=$env:TEMP
+            $sc.IconLocation=$icon+',0'
+            $sc.Description='Launch EverQuest Research & Loot Tool'
+            $sc.Save()
+        }
+
+        $userDataRoot=Join-Path $env:LOCALAPPDATA 'EverQuest Research & Loot Tool'
+        if(-not(Test-Path -LiteralPath $userDataRoot)){New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null}
+        Set-Content -LiteralPath (Join-Path $userDataRoot 'install-root.txt') -Value $root -Encoding UTF8
+    } catch {}
+}
+
+Repair-DesktopShortcut
+
 $monitorScript = Join-Path $root 'live-monitor.ps1'
 $iconPath = Join-Path $root 'EverQuestResearchLoot.ico'
 $toolUrl = 'http://127.0.0.1:8765/index.html'

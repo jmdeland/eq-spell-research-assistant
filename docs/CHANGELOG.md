@@ -1,5 +1,52 @@
 # Changelog
 
+## v0.16.4
+
+- Improves Live Loot responsiveness during long and busy sessions by batching persistence and UI updates.
+- Avoids unnecessary full recipe recalculation for ordinary/unmapped loot.
+- Fixes End Current Loot Session / Start New Session so cleared sessions cannot replay from the monitor's in-memory buffer.
+- Refreshes and self-repairs the desktop shortcut so it points at the active updated application root.
+- Hides the updater PowerShell window during update installation.
+- Adds matching bounded scrolling panes for Recent Loot and Session Loot.
+- Renames **Session Research Loot** to **Session Loot**.
+- Preserves v0.16.3 updater verification, rollback backups, and single-tray/browser protections.
+
+## v0.16.4-demo.4
+
+- Adds a subtle border around the Recent Loot scrolling pane so its bounds are clear.
+- Makes Session Loot independently scrollable at the same height as Recent Loot.
+- Renames **Session Research Loot** to **Session Loot** because it contains all tracked items.
+- Prevents long sessions from continuously increasing the page height.
+- UI-only polish; retains demo.3 shortcut/update fixes, demo.2 Live Loot performance improvements, and demo.1 session-reset fix.
+
+## v0.16.4-demo.3
+
+- Refreshes the **EverQuest Research & Loot Tool** desktop shortcut after every successful update.
+- The shortcut is rebuilt to point at the newly installed application root and current VBS launcher/icon.
+- The tray self-repairs the desktop shortcut on normal application startup.
+- Stores the current canonical application root under LocalAppData for diagnostics.
+- Hides the updater PowerShell process window instead of leaving a visible console open.
+- Keeps updater rollback backups rather than deleting every older application copy.
+- Preserves the Live Loot performance improvements from demo.2 and session-reset fix from demo.1.
+
+## v0.16.4-demo.2
+
+- Performance pass for long/busy Live Loot sessions.
+- Batches session persistence instead of issuing one HTTP POST per loot event.
+- Batches Live Loot DOM updates so a poll containing many drops redraws the UI once instead of once per item.
+- Ordinary/unmapped loot no longer forces a full recipe readiness recalculation.
+- Keeps full session history and recovery persistence intact.
+- Preserves the v0.16.4-demo.1 session-reset fix.
+
+## v0.16.4-demo.1
+
+- Fixes **End Current Loot Session** / **Start New Session** allowing the previous session to reappear.
+- Clearing a session now removes both the persisted recovery file and the running monitor's in-memory event buffer.
+- A new session starts at the current point in the EverQuest log rather than replaying loot already seen by the running monitor.
+- The browser now verifies `/api/session-clear` succeeded instead of silently ignoring failures.
+- The recovery dialog only closes after a new-session clear succeeds.
+- Preserves v0.16.3 launcher, updater, single-tray, and browser-restart fixes.
+
 ## v0.16.3
 
 - Enforces a single system-tray process to prevent duplicate tray instances.
