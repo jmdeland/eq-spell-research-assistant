@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.16.5
+
+- Fixes the Application Updates page remaining stuck on **RESTARTING** after a successful update.
+- Persists the target update version before installation begins.
+- Detects when the local companion returns on the requested/newer version.
+- Automatically changes updater status to **UPDATE COMPLETE** after restart.
+- Reloads the previous update result and restores normal update controls without requiring a manual browser refresh.
+- Pending update state survives a browser refresh during the restart window.
+- No Live Loot, Research, session, shortcut, or updater-installation behavior changed from v0.16.4.
+
 ## v0.16.4
 
 - Improves Live Loot responsiveness during long and busy sessions by batching persistence and UI updates.

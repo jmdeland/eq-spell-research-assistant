@@ -651,6 +651,7 @@ async function pollLiveMonitor(){
   const sj=await status.json();
   const installedVersionEl=$("#installedAppVersion");
   if(installedVersionEl&&sj.version)installedVersionEl.textContent=`v${sj.version}`;
+  if(pendingUpdateTarget)await reconcileCompletedUpdate(sj.version);
   if(Number(sj.lastEventId||0)<liveLastEventId){
    liveLastEventId=0;
    processedLiveEventIds.clear();
@@ -1078,6 +1079,9 @@ $("#clearMagelo")?.addEventListener("click",clearMagelo);
 const UPDATE_API="https://api.github.com/repos/jmdeland/eq-spell-research-assistant/releases/latest";
 let latestUpdateInfo=null;
 let verifiedUpdateInfo=null;
+let pendingUpdateTarget=null;
+let updateReconcileInFlight=false;
+try{pendingUpdateTarget=localStorage.getItem("eqResearchPendingUpdateTarget")||null}catch{}
 function parseVersionParts(v){
  const clean=String(v||"").replace(/^v/i,"").split("-")[0];
  return clean.split(".").map(x=>Number(x)||0).slice(0,3).concat([0,0,0]).slice(0,3);
@@ -1092,6 +1096,40 @@ function updateBadge(text,kind){
  el.textContent=text;el.className=`live-status ${kind||"offline"}`;
 }
 function setUpdateStatus(html){const el=$("#updateStatus");if(el)el.innerHTML=html}
+function normalizeUpdateVersion(v){return String(v||"").replace(/^v/i,"").trim()}
+function setPendingUpdateTarget(tag){
+ pendingUpdateTarget=normalizeUpdateVersion(tag);
+ try{
+  if(pendingUpdateTarget)localStorage.setItem("eqResearchPendingUpdateTarget",pendingUpdateTarget);
+  else localStorage.removeItem("eqResearchPendingUpdateTarget");
+ }catch{}
+}
+function clearPendingUpdateTarget(){setPendingUpdateTarget(null)}
+function resetUpdaterControlsAfterRestart(){
+ const btn=$("#checkForUpdates"),dl=$("#downloadLatestUpdate"),install=$("#installVerifiedUpdate");
+ if(btn){btn.disabled=false;btn.textContent="Check for Updates"}
+ if(dl){dl.disabled=true;dl.textContent="Download & Verify Update"}
+ if(install){install.disabled=true;install.textContent="Install Update"}
+ verifiedUpdateInfo=null;
+}
+async function reconcileCompletedUpdate(runningVersion){
+ if(updateReconcileInFlight||!pendingUpdateTarget)return false;
+ const running=normalizeUpdateVersion(runningVersion);
+ if(!running||compareStableVersions(running,pendingUpdateTarget)<0)return false;
+ updateReconcileInFlight=true;
+ try{
+  await loadUpdaterState();
+  updateBadge("UPDATE COMPLETE","online");
+  setUpdateStatus(`<strong>Update complete.</strong> v${esc(running)} is running. The local companion restarted successfully.`);
+  resetUpdaterControlsAfterRestart();
+  clearPendingUpdateTarget();
+  latestUpdateInfo=null;
+  setSettingsUpdateIndicator(false);
+  return true;
+ }finally{
+  updateReconcileInFlight=false;
+ }
+}
 function renderReleaseNotes(info){
  const box=$("#updateReleaseNotes");if(!box)return;
  const body=String(info?.body||"").trim();
@@ -1184,6 +1222,7 @@ async function installVerifiedUpdate(){
  const tag=verifiedUpdateInfo.latestTag||latestUpdateInfo?.latestTag||"the verified release";
  const warning=`Install ${tag}? The complete current application folder will be backed up before replacement. Continue?`;
  if(!confirm(warning))return;
+ setPendingUpdateTarget(tag);
  if(install){install.disabled=true;install.textContent="Preparing safe install…"}
  updateBadge("INSTALLING","offline");
  setUpdateStatus(`Preparing safe install of <strong>${esc(tag)}</strong>… The companion will close, the current folder will be backed up, and the application should restart automatically.`);
@@ -1193,6 +1232,7 @@ async function installVerifiedUpdate(){
   setUpdateStatus(`<strong>Updater launched.</strong> ${esc(j.latestTag||tag)}<br><span class="muted">Backup will be created at: ${esc(j.backupPath)}</span><br><span class="muted">This page will disconnect while files are replaced. The application should reopen automatically.</span>`);
   updateBadge("RESTARTING","offline");
  }catch(e){
+  clearPendingUpdateTarget();
   updateBadge("INSTALL FAILED","offline");
   setUpdateStatus(`<span class="update-error">Safe install could not start: ${esc(e.message)}</span>`);
   if(install){install.disabled=false;install.textContent=`Install ${tag}`}
