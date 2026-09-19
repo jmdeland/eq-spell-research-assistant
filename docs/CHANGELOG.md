@@ -1,5 +1,80 @@
 # Changelog
 
+## v0.16.6
+
+- Fixes End Current Loot Session so cleared loot does not return.
+- Adds an authoritative EQ log byte watermark when a new loot session begins.
+- Adds backend-owned loot session IDs and rejects delayed writes from closed sessions.
+- Suspends polling and persistence safely while a session reset is in progress.
+- Improves Live Loot responsiveness during long and busy sessions.
+- Removes lazy loading from local spell icons so Researchable Spells icons appear faster.
+- Adds cache-control and build-version query strings so updated browser code is not reused from an older build.
+- Makes Bastion Research corpus syncing safe while the application remains open.
+- Uses atomic file replacement and retry handling for transient Windows file locks during sync.
+- Preserves v0.16.5 updater restart-state recovery and v0.16.4 performance improvements.
+
+## v0.16.6-demo.6
+
+- Makes Bastion Research corpus sync safe while the application remains open.
+- Writes completed sync data to a temporary file first, then atomically replaces the live corpus.
+- Retries transient Windows file-lock failures instead of aborting the entire sync.
+- Keeps the previous verified corpus available until the new corpus is fully written.
+- Uses the same atomic-write protection for sync status files.
+- Applies the same safe-write path to the companion's internal Research corpus writer.
+- Retains demo.5's proven session-reset log watermark, session IDs, cache-control fixes, and immediate spell-icon loading.
+
+## v0.16.6-demo.5
+
+- Adds an authoritative **EQ log byte watermark** when End Current Loot Session is used.
+- The companion advances its log reader to the file's current physical end before the new session begins.
+- Clears any partial-line carry buffer during reset.
+- Prevents the reader from falling behind the new session watermark unless the EQ log is genuinely truncated/rotated.
+- Exposes `sessionStartPosition` and reset time in diagnostics.
+- Retains authoritative backend session IDs, stale-write rejection, polling suspension, cache-control fixes, and immediate spell-icon loading.
+
+## v0.16.6-demo.4
+
+- Replaces timing-only session clearing with an authoritative backend session identity.
+- Every active loot session now has a persistent unique session ID.
+- **End Current Loot Session** rotates to a new backend session ID before deleting the old session data.
+- Delayed writes from the closed session are permanently rejected with HTTP 409 and are never retried.
+- Older browser tabs/builds that do not send a valid session ID can no longer resurrect cleared loot.
+- The browser automatically adopts the backend's current session ID.
+- If another window ends the session, this page detects the session-ID change and clears its stale in-memory session.
+- Session state exposes stale-write diagnostics for troubleshooting.
+- Retains demo.3 polling suspension, demo.2 cache-control fixes, and immediate spell-icon loading.
+
+## v0.16.6-demo.3
+
+- Fixes a second End Session race where a new Live Loot poll could start after reset began but before the backend clear completed.
+- Suspends all Live Loot polling for the full duration of session reset.
+- Invalidates polls that were already in flight when reset begins.
+- Prevents new session-persistence queue entries while reset is active.
+- Prevents normal event processing while reset is active.
+- Waits for any active persistence write to settle before clearing.
+- Clears and verifies backend persistence while polling is suspended.
+- Moves the browser event cursor to the backend's post-clear frontier before polling resumes.
+- Disables the End Session button while the reset is running and shows **Session Cleared** only after verification succeeds.
+- Retains demo.2 cache-control fixes and immediate spell-icon loading.
+
+## v0.16.6-demo.2
+
+- Prevents stale browser code after updates/demos by sending `no-store` cache headers for HTML, JavaScript, CSS, and local data files.
+- Adds build-version query strings to core browser assets so each build executes its own `app.js` and settings code.
+- Keeps local spell-icon/image files cacheable for fast repeat rendering.
+- Verifies `/api/session-state` is actually empty after **End Current Loot Session** before reporting success.
+- Shows an explicit **Session Cleared** confirmation and Live Monitor status message after a verified clear.
+- Retains demo.1's session-generation protection and immediate spell-icon loading.
+
+## v0.16.6-demo.1
+
+- Fixes a race where **End Current Loot Session** could clear successfully and then be repopulated by an older Live Loot poll already in flight.
+- Adds a session-generation guard so pre-clear poll responses are discarded.
+- Starts the fresh session at the monitor's current event frontier instead of resetting the browser event cursor to 0.
+- Removes lazy loading from the small local spell-icon PNGs so Researchable Spells icons begin loading immediately.
+- Keeps icon decoding asynchronous.
+- Retains the v0.16.5 updater-state hotfix and v0.16.4 Live Loot performance improvements.
+
 ## v0.16.5
 
 - Fixes the Application Updates page remaining stuck on **RESTARTING** after a successful update.

@@ -9,7 +9,7 @@ function apiUrl(path){
  return onCompanion?path:`${LIVE_COMPANION_ORIGIN}${path}`;
 }
 
-let ACTIVE_DATA=BASTION_DATA,inventory=[],aggregated=[],inventorySources=[],mageloInventory=[],mageloPlacements=[],mageloMeta=null,recipeResults=[],selectedKey=null,liveLootCounts=new Map(),liveOwnedCounts=new Map(),sessionLootEvents=[],previousMageloCounts=null,liveLootFeed=[],liveLastEventId=0,liveEnabled=true,liveAudioCtx=null,liveMonitorOnline=false,corpusSyncInProgress=false,livePollInFlight=false,processedLiveEventIds=new Set(),sessionRecoveryPending=true,sessionRecoveryChecked=false,autoUpdateCheckStarted=false;
+let ACTIVE_DATA=BASTION_DATA,inventory=[],aggregated=[],inventorySources=[],mageloInventory=[],mageloPlacements=[],mageloMeta=null,recipeResults=[],selectedKey=null,liveLootCounts=new Map(),liveOwnedCounts=new Map(),sessionLootEvents=[],previousMageloCounts=null,liveLootFeed=[],liveLastEventId=0,liveEnabled=true,liveAudioCtx=null,liveMonitorOnline=false,corpusSyncInProgress=false,livePollInFlight=false,liveSessionEpoch=0,sessionResetInProgress=false,liveSessionId=null,processedLiveEventIds=new Set(),sessionRecoveryPending=true,sessionRecoveryChecked=false,autoUpdateCheckStarted=false;
 const $=s=>document.querySelector(s),norm=s=>(s||"").toLowerCase().replace(/[’']/g,"`").replace(/\s+/g," ").trim();
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 function canonical(s){let n=norm(s);if(n.startsWith("spell: "))n=n.slice(7);return(ACTIVE_DATA.aliases||{})[n]||n}
@@ -142,7 +142,7 @@ function spellIconHtml(r,extraClass=""){
  const name=typeof r==="string"?r:(r?.spell||r?.name||"");
  const info=spellIconInfo(name);
  if(!info)return `<span class="skin-spell-icon spell-icon-fallback ${extraClass}" title="Default icon unavailable">✦</span>`;
- return `<img class="skin-spell-icon ${extraClass}" src="${esc(info.asset)}" alt="${esc(name)} spell icon" title="${esc(info.clientName||name)} • default client icon #${info.newIcon}" loading="lazy"/>`;
+ return `<img class="skin-spell-icon ${extraClass}" src="${esc(info.asset)}" alt="${esc(name)} spell icon" title="${esc(info.clientName||name)} • default client icon #${info.newIcon}" decoding="async"/>`;
 }
 function spellNameWithIcon(name,extra=""){return `<span class="spell-name-inline">${spellIconHtml(name,"inline-spell-icon")}<span>${esc(name)}${extra}</span></span>`}
 function renderSummary(){const a=rows();$("#sumReady").textContent=a.filter(r=>!r._pending&&r.missingCount===0).length;$("#sumOne").textContent=a.filter(r=>!r._pending&&r.missingCount===1).length;$("#sumPending").textContent=a.filter(r=>r._pending).length;$("#sumShown").textContent=a.length}
@@ -489,26 +489,38 @@ function addCraftableAlerts(spells,evt){
 }
 let pendingSessionPersist=[],sessionPersistTimer=null,sessionPersistPromise=null;
 function queueSessionEvent(entry){
- if(!entry||!liveMonitorOnline)return;
+ if(!entry||!liveMonitorOnline||sessionResetInProgress||!liveSessionId)return;
  pendingSessionPersist.push(entry);
  if(!sessionPersistTimer)sessionPersistTimer=setTimeout(()=>{sessionPersistTimer=null;flushSessionPersistQueue()},150);
 }
 async function flushSessionPersistQueue(){
- if(sessionPersistPromise||!pendingSessionPersist.length||!liveMonitorOnline)return sessionPersistPromise;
+ if(sessionPersistPromise||!pendingSessionPersist.length||!liveMonitorOnline||!liveSessionId)return sessionPersistPromise;
  const batch=pendingSessionPersist.splice(0,100);
+ const batchSessionId=liveSessionId;
  sessionPersistPromise=(async()=>{
   try{
    const r=await fetch(apiUrl("/api/session-events"),{
     method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({events:batch}),cache:"no-store"
+    body:JSON.stringify({sessionId:batchSessionId,events:batch}),cache:"no-store"
    });
    let j=null;try{j=await r.json()}catch{}
+
+   if(r.status===409||j?.staleSession){
+    // The backend has permanently closed this session. Never retry these rows.
+    if(j?.currentSessionId)liveSessionId=String(j.currentSessionId);
+    const msg=$("#liveMonitorMessage");
+    if(msg)msg.textContent=`Discarded ${batch.length} delayed loot write${batch.length===1?"":"s"} from a closed session.`;
+    return;
+   }
    if(!r.ok||!j?.ok)throw Error(j?.error||`session-events HTTP ${r.status}`);
+   if(j.sessionId)liveSessionId=String(j.sessionId);
   }catch(e){
+   // Retry only ordinary transport/server failures. Closed-session writes are
+   // handled above and are intentionally destroyed.
    pendingSessionPersist.unshift(...batch);
   }finally{
    sessionPersistPromise=null;
-   if(pendingSessionPersist.length&&!sessionPersistTimer){
+   if(pendingSessionPersist.length&&!sessionPersistTimer&&!sessionResetInProgress){
     sessionPersistTimer=setTimeout(()=>{sessionPersistTimer=null;flushSessionPersistQueue()},250);
    }
   }
@@ -530,26 +542,96 @@ function applySessionEvents(events){
  evaluate();renderLiveFeed();renderLiveSession();renderSummary();renderList();renderDetail();renderReverseLookup();
 }
 async function clearPersistedSession(){
- const r=await fetch(apiUrl("/api/session-clear"),{method:"POST",cache:"no-store"});
+ if(!liveSessionId){
+  const stateResp=await fetch(apiUrl("/api/session-state"),{cache:"no-store"});
+  const state=await stateResp.json();
+  if(!stateResp.ok||!state?.ok||!state?.sessionId)throw Error("Could not obtain the active loot session ID.");
+  liveSessionId=String(state.sessionId);
+ }
+ const r=await fetch(apiUrl("/api/session-clear"),{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({sessionId:liveSessionId}),
+  cache:"no-store"
+ });
  let j=null;try{j=await r.json()}catch{}
+ if(r.status===409||j?.staleSession){
+  if(j?.currentSessionId)liveSessionId=String(j.currentSessionId);
+  throw Error("The loot session changed in another window. Try End Current Loot Session again.");
+ }
  if(!r.ok||!j?.ok)throw Error(j?.error||`session-clear HTTP ${r.status}`);
+ if(j.sessionId)liveSessionId=String(j.sessionId);
  return j;
 }
 async function clearLootSession({confirmFirst=true}={}){
  if(confirmFirst&&!confirm("End this loot session? The saved session history and provisional live-loot counts will be cleared."))return false;
+ if(sessionResetInProgress)return false;
+
+ sessionResetInProgress=true;
+ const resetEpoch=++liveSessionEpoch;
+ const btn=$("#endLootSession");
+ const originalButtonText=btn?.textContent||"End Current Loot Session";
+ if(btn){btn.disabled=true;btn.textContent="Clearing Session…"}
+
  try{
+  // Cancel any scheduled persistence and wait for a currently active write to settle.
   if(sessionPersistTimer){clearTimeout(sessionPersistTimer);sessionPersistTimer=null}
   pendingSessionPersist=[];
   if(sessionPersistPromise){try{await sessionPersistPromise}catch{}}
   pendingSessionPersist=[];
-  await clearPersistedSession();
-  sessionLootEvents=[];liveLootCounts=new Map();liveOwnedCounts=new Map();liveLootFeed=[];processedLiveEventIds.clear();
-  liveLastEventId=0;
-  evaluate();renderLiveFeed();renderLiveSession();renderSummary();renderList();renderDetail();renderReverseLookup();
-  return true;
+
+  // Any poll that began before this point now carries an older epoch and will
+  // discard its response. New polls are blocked by sessionResetInProgress.
+  const cleared=await clearPersistedSession();
+
+  // Move the browser cursor to the monitor frontier returned by the atomic clear.
+  // This defines the new session as "anything looted after End Session".
+  liveLastEventId=Math.max(0,Number(cleared?.nextEventId||1)-1);
+  const resetLogPosition=Number(cleared?.sessionStartPosition||0);
+
+  // Clear all browser-side session representations.
+  sessionLootEvents=[];
+  liveLootCounts=new Map();
+  liveOwnedCounts=new Map();
+  liveLootFeed=[];
+  processedLiveEventIds.clear();
+
+  evaluate();
+  renderLiveFeed();
+  renderLiveSession();
+  renderSummary();
+  renderList();
+  renderDetail();
+  renderReverseLookup();
+
+  // Verify persistence remained empty while polling was suspended.
+  const verifyResp=await fetch(apiUrl("/api/session-state"),{cache:"no-store"});
+  let verify=null;try{verify=await verifyResp.json()}catch{}
+  const remaining=Array.isArray(verify?.events)?verify.events.length:0;
+  if(verify?.sessionId)liveSessionId=String(verify.sessionId);
+  if(!verifyResp.ok||!verify?.ok||verify?.hasSession||remaining||!liveSessionId){
+   throw Error(`session clear verification failed (${remaining} saved event${remaining===1?"":"s"} remain)`);
+  }
+
+  // Verify backend buffered events were really cleared too. If the status
+  // frontier advanced due to brand-new loot during the reset, that loot will
+  // be picked up only after polling resumes.
+  const msg=$("#liveMonitorMessage");
+  if(msg)msg.textContent=`Loot session ended. New session ${liveSessionId.slice(0,8)} starts at EQ log byte ${resetLogPosition}; pre-reset log content cannot be replayed.`;
+
+  if(btn){btn.textContent="Session Cleared"}
+  setTimeout(()=>{
+   if(btn){btn.disabled=false;btn.textContent=originalButtonText}
+  },1800);
+
+  return resetEpoch===liveSessionEpoch;
  }catch(e){
+  if(btn){btn.disabled=false;btn.textContent=originalButtonText}
   alert(`Could not end the loot session: ${e.message}`);
   return false;
+ }finally{
+  // Only resume polling after backend verification and browser clearing finish.
+  sessionResetInProgress=false;
  }
 }
 async function checkRecoverableSession(){
@@ -557,6 +639,7 @@ async function checkRecoverableSession(){
  sessionRecoveryChecked=true;
  try{
   const r=await fetch(apiUrl("/api/session-state"),{cache:"no-store"}),j=await r.json();
+  if(j?.sessionId)liveSessionId=String(j.sessionId);
   const events=Array.isArray(j?.events)?j.events:[];
   if(j.ok&&j.hasSession&&events.length){
    const modal=$("#sessionRecoveryModal"),text=$("#sessionRecoveryText");
@@ -564,7 +647,7 @@ async function checkRecoverableSession(){
    if(text)text.textContent=`${events.length} loot event${events.length===1?"":"s"} saved from ${saved}. Restore them and continue the session, or start fresh.`;
    modal?.classList.remove("hidden");
    const restore=$("#restoreLootSession"),fresh=$("#startNewLootSession");
-   if(restore)restore.onclick=()=>{applySessionEvents(events);modal.classList.add("hidden");sessionRecoveryPending=false};
+   if(restore)restore.onclick=()=>{if(j?.sessionId)liveSessionId=String(j.sessionId);applySessionEvents(events);modal.classList.add("hidden");sessionRecoveryPending=false};
    if(fresh)fresh.onclick=async()=>{
     const ok=await clearLootSession({confirmFirst:false});
     if(ok){modal.classList.add("hidden");sessionRecoveryPending=false}
@@ -573,6 +656,7 @@ async function checkRecoverableSession(){
  }catch{sessionRecoveryPending=false}
 }
 function processLootEvent(evt,{isReplay=false,deferRender=false}={}){
+ if(sessionResetInProgress&&!isReplay)return {processed:false,recipeChanged:false};
  if(!isReplay&&evt?.id!=null){
   const eventId=Number(evt.id);
   if(processedLiveEventIds.has(eventId))return {processed:false,recipeChanged:false};
@@ -588,7 +672,7 @@ function processLootEvent(evt,{isReplay=false,deferRender=false}={}){
  const countedAsOwned=(s.ownershipMode==="COUNT")&&tracked;
  if(!isReplay){
   const sessionEntry={
-   id:evt.id??null,timestamp:evt.timestamp||"",looter:evt.looter||"Unknown",self:!!evt.self,
+   id:evt.id??null,sessionId:liveSessionId,timestamp:evt.timestamp||"",looter:evt.looter||"Unknown",self:!!evt.self,
    item:evt.item||"",researchValue:cls.uses.length?cls.value:(/^words? of |^rune of |grimoire|compendium|memoir|writ|tome|signet|emblem|bolts|card of /i.test(evt.item)?"UNKNOWN":""),
    verifiedUses:cls.uses.length,ambiguous:!!cls.ambiguous,candidateIds:(cls.ids||[]).join("|"),
    tracked,countedAsOwned,ownershipMode:s.ownershipMode,recordedAt:new Date().toISOString()
@@ -643,8 +727,9 @@ function refreshLiveHeaderStatus(){
  const el=$("#liveOwnershipSummary");if(el)el.textContent=liveOwnershipSummaryText(mode);
 }
 async function pollLiveMonitor(){
- if(livePollInFlight)return;
+ if(livePollInFlight||sessionResetInProgress)return;
  livePollInFlight=true;
+ const pollEpoch=liveSessionEpoch;
  try{
   const status=await fetch(apiUrl("/api/status"),{cache:"no-store"});
   if(!status.ok)throw Error(`status HTTP ${status.status}`);
@@ -652,6 +737,25 @@ async function pollLiveMonitor(){
   const installedVersionEl=$("#installedAppVersion");
   if(installedVersionEl&&sj.version)installedVersionEl.textContent=`v${sj.version}`;
   if(pendingUpdateTarget)await reconcileCompletedUpdate(sj.version);
+
+  if(sj.sessionId){
+   const backendSessionId=String(sj.sessionId);
+   if(liveSessionId&&backendSessionId!==liveSessionId&&!sessionResetInProgress){
+    // Another window ended the session. Adopt the new authoritative session
+    // and discard this page's old client-side session immediately.
+    liveSessionId=backendSessionId;
+    pendingSessionPersist=[];
+    sessionLootEvents=[];
+    liveLootCounts=new Map();
+    liveOwnedCounts=new Map();
+    liveLootFeed=[];
+    processedLiveEventIds.clear();
+    renderLiveFeed();
+    renderLiveSession();
+   }else if(!liveSessionId){
+    liveSessionId=backendSessionId;
+   }
+  }
   if(Number(sj.lastEventId||0)<liveLastEventId){
    liveLastEventId=0;
    processedLiveEventIds.clear();
@@ -672,6 +776,13 @@ async function pollLiveMonitor(){
   if(!r.ok)throw Error(`events HTTP ${r.status}`);
   const j=await r.json();
   const events=j.events||[];
+
+  // If the session was ended while this request was in flight, the response
+  // belongs to the old session. Do not allow it to repopulate the new session.
+  if(pollEpoch!==liveSessionEpoch){
+   liveLastEventId=Math.max(liveLastEventId,Number(j.lastEventId||0));
+   return;
+  }
 
   // Advance the cursor before doing any UI/recipe work so even if another
   // poll is triggered later it cannot request this same event batch again.
@@ -841,7 +952,7 @@ async function syncBastionCorpus(){
   const r=await fetch(apiUrl("/api/bastion-sync"),{cache:"no-store"});
   const j=await r.json();
   if(!j.ok)throw Error(j.error||"Could not start sync");
-  $("#corpusSyncStatus").textContent=j.alreadyRunning?"Sync is already running.":"Bastion sync started in the background.";
+  $("#corpusSyncStatus").textContent=j.alreadyRunning?"Sync is already running.":"Bastion sync started in the background. You can keep the application open while it runs.";
   $("#corpusSyncStatus").className="sync-working";
   await watchBastionSync();
  }catch(e){

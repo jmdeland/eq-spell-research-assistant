@@ -6,8 +6,42 @@ if(-not $Root){$Root=Split-Path -Parent $MyInvocation.MyCommand.Path}
 $outPath=Join-Path $Root "data\bastion-synced-recipes.json"
 $statusPath=Join-Path $Root "data\bastion-sync-status.json"
 
+
+function Write-AtomicUtf8File([string]$Path,[string]$Content,[int]$MaxAttempts=20) {
+    $dir=Split-Path -Parent $Path
+    if(-not(Test-Path -LiteralPath $dir)){New-Item -ItemType Directory -Path $dir -Force | Out-Null}
+    $tmp=Join-Path $dir (".{0}.{1}.tmp" -f [IO.Path]::GetFileName($Path),[guid]::NewGuid().ToString("N"))
+    try{
+        [IO.File]::WriteAllText($tmp,$Content,(New-Object Text.UTF8Encoding($false)))
+        for($attempt=1;$attempt -le $MaxAttempts;$attempt++){
+            try{
+                if(Test-Path -LiteralPath $Path){
+                    $backup=$Path+".replace-backup"
+                    try{
+                        [IO.File]::Replace($tmp,$Path,$backup,$true)
+                        if(Test-Path -LiteralPath $backup){Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue}
+                    }catch{
+                        # File.Replace is not available for every filesystem/path situation.
+                        # Fall back to move-overwrite behavior once the destination unlocks.
+                        if(Test-Path -LiteralPath $Path){Remove-Item -LiteralPath $Path -Force -ErrorAction Stop}
+                        Move-Item -LiteralPath $tmp -Destination $Path -Force -ErrorAction Stop
+                    }
+                }else{
+                    Move-Item -LiteralPath $tmp -Destination $Path -Force -ErrorAction Stop
+                }
+                return
+            }catch{
+                if($attempt -ge $MaxAttempts){throw}
+                Start-Sleep -Milliseconds (100 + ($attempt * 75))
+            }
+        }
+    }finally{
+        if(Test-Path -LiteralPath $tmp){Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue}
+    }
+}
+
 function Write-Status($state,$message,$pages=0,$ids=0,$parsed=0,$errors=0){
-    [pscustomobject]@{
+    $json=[pscustomobject]@{
         state=$state
         message=$message
         pagesScanned=$pages
@@ -15,7 +49,8 @@ function Write-Status($state,$message,$pages=0,$ids=0,$parsed=0,$errors=0){
         recipeCount=$parsed
         errors=$errors
         updatedAt=(Get-Date).ToString("o")
-    }|ConvertTo-Json -Depth 6|Set-Content -LiteralPath $statusPath -Encoding UTF8
+    }|ConvertTo-Json -Depth 6
+    Write-AtomicUtf8File $statusPath $json
 }
 function Strip-Html([string]$html){
     $x=[regex]::Replace($html,'<script\b[^>]*>.*?</script>',' ','Singleline,IgnoreCase')
@@ -144,7 +179,9 @@ try{
         discoveryMode="full-index-async";pagesScanned=$pages;recipeIdsFound=$ids.Count;
         recipes=@($recipes);errors=@($errs)
     }
-    $payload|ConvertTo-Json -Depth 20|Set-Content -LiteralPath $outPath -Encoding UTF8
+    $json=$payload|ConvertTo-Json -Depth 20
+    Write-Status "running" "Finalizing verified Research corpus..." $pages $ids.Count $recipes.Count $errs.Count
+    Write-AtomicUtf8File $outPath $json
     Write-Status "complete" "Bastion Research sync complete." $pages $ids.Count $recipes.Count $errs.Count
 }catch{
     Write-Status "error" $_.Exception.Message

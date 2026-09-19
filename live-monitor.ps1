@@ -7,6 +7,7 @@ $syncDataPath = Join-Path $root "data\bastion-synced-recipes.json"
 $userDataRoot = Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"
 if(-not (Test-Path -LiteralPath $userDataRoot)){New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null}
 $sessionStatePath = Join-Path $userDataRoot "session-loot.jsonl"
+$sessionMetaPath = Join-Path $userDataRoot "session-meta.json"
 $trayPidPath = Join-Path $userDataRoot "tray.pid"
 $shutdownRequestPath = Join-Path $userDataRoot "shutdown-for-update.request"
 $suppressBrowserPath = Join-Path $userDataRoot "suppress-browser-once.request"
@@ -22,6 +23,40 @@ function Get-Config {
     }
 }
 function Save-Config($cfg) {$cfg | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $configPath -Encoding UTF8}
+
+function Write-AtomicUtf8File([string]$Path,[string]$Content,[int]$MaxAttempts=20) {
+    $dir=Split-Path -Parent $Path
+    if(-not(Test-Path -LiteralPath $dir)){New-Item -ItemType Directory -Path $dir -Force | Out-Null}
+    $tmp=Join-Path $dir (".{0}.{1}.tmp" -f [IO.Path]::GetFileName($Path),[guid]::NewGuid().ToString("N"))
+    try{
+        [IO.File]::WriteAllText($tmp,$Content,(New-Object Text.UTF8Encoding($false)))
+        for($attempt=1;$attempt -le $MaxAttempts;$attempt++){
+            try{
+                if(Test-Path -LiteralPath $Path){
+                    $backup=$Path+".replace-backup"
+                    try{
+                        [IO.File]::Replace($tmp,$Path,$backup,$true)
+                        if(Test-Path -LiteralPath $backup){Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue}
+                    }catch{
+                        # File.Replace is not available for every filesystem/path situation.
+                        # Fall back to move-overwrite behavior once the destination unlocks.
+                        if(Test-Path -LiteralPath $Path){Remove-Item -LiteralPath $Path -Force -ErrorAction Stop}
+                        Move-Item -LiteralPath $tmp -Destination $Path -Force -ErrorAction Stop
+                    }
+                }else{
+                    Move-Item -LiteralPath $tmp -Destination $Path -Force -ErrorAction Stop
+                }
+                return
+            }catch{
+                if($attempt -ge $MaxAttempts){throw}
+                Start-Sleep -Milliseconds (100 + ($attempt * 75))
+            }
+        }
+    }finally{
+        if(Test-Path -LiteralPath $tmp){Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue}
+    }
+}
+
 function Choose-LogFile {
     Add-Type -AssemblyName System.Windows.Forms
     $dlg = New-Object System.Windows.Forms.OpenFileDialog
@@ -39,7 +74,7 @@ function Strip-Html([string]$html) {
     return ([regex]::Replace($x,'\s+',' ')).Trim()
 }
 function Invoke-Bastion([string]$url) {
-    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Research-Loot-Tool/0.16.5"}).Content
+    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Research-Loot-Tool/0.16.6"}).Content
 }
 function Parse-RecipePage([int]$id,[string]$html) {
     $plain=Strip-Html $html
@@ -193,7 +228,8 @@ function Sync-BastionResearch {
         recipes=@($recipes)
         errors=@($errors)
     }
-    $payload | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $syncDataPath -Encoding UTF8
+    $json=$payload | ConvertTo-Json -Depth 20
+    Write-AtomicUtf8File $syncDataPath $json
     return $payload
 }
 
@@ -217,8 +253,11 @@ $events=New-Object System.Collections.ArrayList
 $nextId=1
 $position=0L
 $carry=""
+$script:sessionStartPosition=0L
+$script:sessionResetAt=$null
 $script:metadataSyncJob=$null
 try{$fi=Get-Item -LiteralPath $logPath;if($config.startAtEnd -ne $false){$position=[int64]$fi.Length}}catch{}
+$script:sessionStartPosition=[int64]$position
 
 
 function Parse-LootLine([string]$line) {
@@ -237,7 +276,13 @@ function Parse-LootLine([string]$line) {
 function Read-NewLoot {
     if(-not $logPath -or -not(Test-Path -LiteralPath $logPath)){return}
     $fi=Get-Item -LiteralPath $logPath
-    if($fi.Length -lt $position){$position=0L;$carry=""}
+    if($fi.Length -lt $position){
+        # A real log truncation/rotation invalidates the old byte watermark.
+        $position=0L
+        $script:sessionStartPosition=0L
+        $carry=""
+    }
+    if($position -lt $script:sessionStartPosition){$position=[int64]$script:sessionStartPosition;$carry=""}
     if($fi.Length -eq $position){return}
     $fs=New-Object IO.FileStream($logPath,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
     try{
@@ -475,7 +520,7 @@ function Convert-VersionCore([string]$version){
     return [version]("{0}.{1}.{2}" -f $parts[0],$parts[1],$parts[2])
 }
 function Get-LatestGitHubRelease {
-    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.5";"Accept"="application/vnd.github+json"}
+    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.6";"Accept"="application/vnd.github+json"}
     return Invoke-RestMethod -UseBasicParsing -Uri $updateApi -TimeoutSec 45 -Headers $headers
 }
 function Get-UpdateInfo {
@@ -515,7 +560,7 @@ function Download-AndVerifyLatestUpdate {
     $dest=Join-Path $updateStage $info.assetName
     $tmp=$dest+".download"
     if(Test-Path -LiteralPath $tmp){Remove-Item -LiteralPath $tmp -Force}
-    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.5"}
+    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.6"}
     try{
         Invoke-WebRequest -UseBasicParsing -Uri $info.assetUrl -OutFile $tmp -TimeoutSec 120 -Headers $headers
         $actual=(Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -720,54 +765,170 @@ try {
 }
 
 
+
+function Save-SessionIdentity {
+    $payload=[pscustomobject]@{
+        sessionId=[string]$script:sessionId
+        createdAt=[string]$script:sessionCreatedAt
+    }
+    $payload | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $sessionMetaPath -Encoding UTF8
+}
+function Initialize-SessionIdentity {
+    if(Test-Path -LiteralPath $sessionMetaPath){
+        try{
+            $m=Get-Content -LiteralPath $sessionMetaPath -Raw | ConvertFrom-Json
+            if($m.sessionId){
+                $script:sessionId=[string]$m.sessionId
+                $script:sessionCreatedAt=$(if($m.createdAt){[string]$m.createdAt}else{(Get-Date).ToString("o")})
+                return
+            }
+        }catch{}
+    }
+    $script:sessionId=[guid]::NewGuid().ToString("N")
+    $script:sessionCreatedAt=(Get-Date).ToString("o")
+    Save-SessionIdentity
+}
+function Rotate-SessionIdentity {
+    $script:sessionId=[guid]::NewGuid().ToString("N")
+    $script:sessionCreatedAt=(Get-Date).ToString("o")
+    Save-SessionIdentity
+    return $script:sessionId
+}
+function Test-SessionIdentity([string]$clientSessionId) {
+    return (-not [string]::IsNullOrWhiteSpace($clientSessionId)) -and ($clientSessionId -eq [string]$script:sessionId)
+}
+function Register-StaleSessionWrite([string]$clientSessionId,[int]$count) {
+    $script:staleSessionRejects++
+    $script:lastRejectedSessionId=$(if($clientSessionId){$clientSessionId}else{"<missing>"})
+    $script:lastRejectedAt=(Get-Date).ToString("o")
+    return [pscustomobject]@{
+        ok=$false
+        staleSession=$true
+        error="This loot write belongs to a closed or unknown session."
+        rejectedCount=$count
+        submittedSessionId=$(if($clientSessionId){$clientSessionId}else{$null})
+        currentSessionId=[string]$script:sessionId
+    }
+}
+
 function Read-RequestJson($req) {
     $reader=New-Object IO.StreamReader($req.InputStream,$req.ContentEncoding)
     try{$raw=$reader.ReadToEnd()}finally{$reader.Dispose()}
     if(-not $raw){return $null}
     return ($raw | ConvertFrom-Json)
 }
+$script:staleSessionRejects=0
+$script:lastRejectedSessionId=$null
+$script:lastRejectedAt=$null
+Initialize-SessionIdentity
+
 function Get-SessionState {
-    if(-not(Test-Path -LiteralPath $sessionStatePath)){return [pscustomobject]@{ok=$true;hasSession=$false;events=@();savedAt=$null}}
+    $base=[ordered]@{
+        ok=$true
+        sessionId=[string]$script:sessionId
+        sessionCreatedAt=[string]$script:sessionCreatedAt
+        hasSession=$false
+        events=@()
+        savedAt=$null
+        staleSessionRejects=[int]$script:staleSessionRejects
+        lastRejectedSessionId=$script:lastRejectedSessionId
+        lastRejectedAt=$script:lastRejectedAt
+    }
+    if(-not(Test-Path -LiteralPath $sessionStatePath)){return [pscustomobject]$base}
     try{
         $rows=New-Object System.Collections.ArrayList
         $last=$null
         foreach($line in (Get-Content -LiteralPath $sessionStatePath -ErrorAction Stop)){
             if(-not [string]::IsNullOrWhiteSpace($line)){
-                try{$evt=$line|ConvertFrom-Json;[void]$rows.Add($evt);if($evt.recordedAt){$last=[string]$evt.recordedAt}}catch{}
+                try{
+                    $evt=$line|ConvertFrom-Json
+                    # Ignore legacy/stale rows if an old file somehow survived a rotation.
+                    if($evt.sessionId -and ([string]$evt.sessionId -ne [string]$script:sessionId)){continue}
+                    [void]$rows.Add($evt)
+                    if($evt.recordedAt){$last=[string]$evt.recordedAt}
+                }catch{}
             }
         }
-        return [pscustomobject]@{ok=$true;hasSession=($rows.Count -gt 0);events=@($rows);savedAt=$last}
-    }catch{return [pscustomobject]@{ok=$false;hasSession=$false;events=@();savedAt=$null;error=$_.Exception.Message}}
+        $base.hasSession=($rows.Count -gt 0)
+        $base.events=@($rows)
+        $base.savedAt=$last
+        return [pscustomobject]$base
+    }catch{
+        return [pscustomobject]@{
+            ok=$false
+            sessionId=[string]$script:sessionId
+            hasSession=$false
+            events=@()
+            savedAt=$null
+            error=$_.Exception.Message
+        }
+    }
 }
-function Append-SessionEvent($evt) {
+function Append-SessionEvent($evt,[string]$clientSessionId) {
+    if(-not(Test-SessionIdentity $clientSessionId)){return Register-StaleSessionWrite $clientSessionId 1}
     if($null -eq $evt){throw "No session event supplied."}
+    $evt | Add-Member -NotePropertyName sessionId -NotePropertyValue ([string]$script:sessionId) -Force
     $line=$evt|ConvertTo-Json -Depth 8 -Compress
     Add-Content -LiteralPath $sessionStatePath -Value $line -Encoding UTF8
-    return [pscustomobject]@{ok=$true;path=$sessionStatePath}
+    return [pscustomobject]@{ok=$true;count=1;sessionId=[string]$script:sessionId;path=$sessionStatePath}
 }
-function Append-SessionEvents($items) {
+function Append-SessionEvents($items,[string]$clientSessionId) {
     $batch=@($items)
-    if($batch.Count -eq 0){return [pscustomobject]@{ok=$true;count=0;path=$sessionStatePath}}
+    if(-not(Test-SessionIdentity $clientSessionId)){return Register-StaleSessionWrite $clientSessionId $batch.Count}
+    if($batch.Count -eq 0){return [pscustomobject]@{ok=$true;count=0;sessionId=[string]$script:sessionId;path=$sessionStatePath}}
     $lines=New-Object System.Collections.Generic.List[string]
     foreach($evt in $batch){
         if($null -eq $evt){continue}
+        $evt | Add-Member -NotePropertyName sessionId -NotePropertyValue ([string]$script:sessionId) -Force
         $lines.Add(($evt|ConvertTo-Json -Depth 8 -Compress))
     }
     if($lines.Count -gt 0){Add-Content -LiteralPath $sessionStatePath -Value $lines.ToArray() -Encoding UTF8}
-    return [pscustomobject]@{ok=$true;count=$lines.Count;path=$sessionStatePath}
+    return [pscustomobject]@{ok=$true;count=$lines.Count;sessionId=[string]$script:sessionId;path=$sessionStatePath}
 }
-function Clear-SessionState {
+function Clear-SessionState([string]$clientSessionId) {
+    if(-not(Test-SessionIdentity $clientSessionId)){return Register-StaleSessionWrite $clientSessionId 0}
+    $closedSessionId=[string]$script:sessionId
+
+    # Rotate first. Delayed writes for the closed session are invalid from here on.
+    $newSessionId=Rotate-SessionIdentity
+
+    # Establish an authoritative source boundary at the current end of the EQ log.
+    # Anything already in the file belongs to the closed session and must never
+    # be emitted again as a new event, even if StreamReader/file buffering behaved
+    # unexpectedly on an earlier read.
+    $oldPosition=[int64]$position
+    $sourceEnd=[int64]$position
+    try{
+        $sourceInfo=Get-Item -LiteralPath $logPath -ErrorAction Stop
+        $sourceEnd=[int64]$sourceInfo.Length
+    }catch{}
+    $position=$sourceEnd
+    $carry=""
+    $script:sessionStartPosition=$sourceEnd
+    $script:sessionResetAt=(Get-Date).ToString("o")
+
     if(Test-Path -LiteralPath $sessionStatePath){Remove-Item -LiteralPath $sessionStatePath -Force}
-    # Starting a new loot session means "from now forward". Clear events already
-    # buffered by this running monitor so they cannot be replayed into the new session.
     $clearedBufferedEvents=$events.Count
     $events.Clear()
-    return [pscustomobject]@{ok=$true;clearedBufferedEvents=$clearedBufferedEvents;nextEventId=$nextId}
+
+    return [pscustomobject]@{
+        ok=$true
+        closedSessionId=$closedSessionId
+        sessionId=$newSessionId
+        sessionCreatedAt=[string]$script:sessionCreatedAt
+        clearedBufferedEvents=$clearedBufferedEvents
+        nextEventId=$nextId
+        previousLogPosition=$oldPosition
+        sessionStartPosition=$script:sessionStartPosition
+        logLengthAtReset=$sourceEnd
+        sessionResetAt=$script:sessionResetAt
+        staleSessionRejects=[int]$script:staleSessionRejects
+    }
 }
 
 $shutdownForUpdate=$false
 $listener=New-Object Net.HttpListener;$prefix="http://127.0.0.1:$port/";$listener.Prefixes.Add($prefix);$listener.Start()
-Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.16.5";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
+Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.16.6";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
 
 try{
 while($listener.IsListening){
@@ -788,7 +949,12 @@ while($listener.IsListening){
             $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
         }
         if($path -eq "/api/session-event"){
-            try{$evt=Read-RequestJson $req;$payload=(Append-SessionEvent $evt|ConvertTo-Json -Depth 4)}catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
+            try{
+                $body=Read-RequestJson $req
+                $result=Append-SessionEvent $body.event ([string]$body.sessionId)
+                if($result.staleSession){$res.StatusCode=409}
+                $payload=($result|ConvertTo-Json -Depth 6)
+            }catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
             $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
         }
         if($path -eq "/api/session-events"){
@@ -796,13 +962,19 @@ while($listener.IsListening){
                 $body=Read-RequestJson $req
                 $items=@()
                 if($body -and $body.events){$items=@($body.events)}
-                $payload=(Append-SessionEvents $items|ConvertTo-Json -Depth 4)
+                $result=Append-SessionEvents $items ([string]$body.sessionId)
+                if($result.staleSession){$res.StatusCode=409}
+                $payload=($result|ConvertTo-Json -Depth 6)
             }catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
             $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
         }
         if($path -eq "/api/session-clear"){
-
-            try{$payload=(Clear-SessionState|ConvertTo-Json -Depth 4)}catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
+            try{
+                $body=Read-RequestJson $req
+                $result=Clear-SessionState ([string]$body.sessionId)
+                if($result.staleSession){$res.StatusCode=409}
+                $payload=($result|ConvertTo-Json -Depth 6)
+            }catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
             $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
         }
 
@@ -832,7 +1004,7 @@ while($listener.IsListening){
         if($path -eq "/api/status"){
             $sync=$null;if(Test-Path $syncDataPath){try{$sync=Get-Content $syncDataPath -Raw|ConvertFrom-Json}catch{}}
             $appVersion=Get-AppVersionInfo
-            $payload=[pscustomobject]@{app="EverQuest Research & Loot Tool";version=[string]$appVersion.version;channel=[string]$appVersion.channel;root=$root;active=$true;logPath=$logPath;logFile=$logFileName;character=$character;lastEventId=$nextId-1;position=$position;sync=$(if($sync){[pscustomobject]@{syncedAt=$sync.syncedAt;recipeCount=@($sync.recipes).Count;errors=@($sync.errors).Count}}else{$null})}|ConvertTo-Json -Depth 8
+            $payload=[pscustomobject]@{app="EverQuest Research & Loot Tool";version=[string]$appVersion.version;channel=[string]$appVersion.channel;root=$root;active=$true;logPath=$logPath;logFile=$logFileName;character=$character;lastEventId=$nextId-1;position=$position;sessionStartPosition=$script:sessionStartPosition;sessionResetAt=$script:sessionResetAt;sessionId=[string]$script:sessionId;staleSessionRejects=[int]$script:staleSessionRejects;sync=$(if($sync){[pscustomobject]@{syncedAt=$sync.syncedAt;recipeCount=@($sync.recipes).Count;errors=@($sync.errors).Count}}else{$null})}|ConvertTo-Json -Depth 8
             $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.StatusCode=200;$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
         }
         if($path -eq "/api/events"){
@@ -1077,7 +1249,20 @@ while($listener.IsListening){
         $target=[IO.Path]::GetFullPath((Join-Path $root $relative));$rootFull=[IO.Path]::GetFullPath($root)
         if(-not$target.StartsWith($rootFull,[StringComparison]::OrdinalIgnoreCase)){$res.StatusCode=403;continue}
         if(-not(Test-Path -LiteralPath $target -PathType Leaf)){$res.StatusCode=404;continue}
-        $bytes=[IO.File]::ReadAllBytes($target);$res.ContentType=Get-ContentType $target;$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length)
+        $bytes=[IO.File]::ReadAllBytes($target)
+        $ext=[IO.Path]::GetExtension($target).ToLowerInvariant()
+        if($ext -eq ".png" -or $ext -eq ".jpg" -or $ext -eq ".jpeg" -or $ext -eq ".gif" -or $ext -eq ".ico"){
+            # Immutable local artwork can be cached; these files do not change in-place within a build.
+            $res.Headers["Cache-Control"]="public, max-age=86400"
+        }else{
+            # App shell/code/data must never survive across an installed build change.
+            $res.Headers["Cache-Control"]="no-store, no-cache, must-revalidate, max-age=0"
+            $res.Headers["Pragma"]="no-cache"
+            $res.Headers["Expires"]="0"
+        }
+        $res.ContentType=Get-ContentType $target
+        $res.ContentLength64=$bytes.Length
+        $res.OutputStream.Write($bytes,0,$bytes.Length)
     }catch{
         try{$msg=[Text.Encoding]::UTF8.GetBytes($_.Exception.Message);$res.StatusCode=500;$res.ContentType="text/plain; charset=utf-8";$res.ContentLength64=$msg.Length;$res.OutputStream.Write($msg,0,$msg.Length)}catch{}
     }finally{try{$res.OutputStream.Close()}catch{}}

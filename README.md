@@ -2,7 +2,7 @@
 
 A local Windows companion for the **Bastion EverQuest server** that combines live loot monitoring, spell Research planning, Bastion Magelo inventory mapping, item lookup, session tracking, and safe self-updating.
 
-**Current stable release: v0.16.5**
+**Current stable release: v0.16.6**
 
 > Built for EverQuest players who want to know, in real time, whether a drop matters for Research — and whether they already have what they need to make a spell.
 
@@ -311,11 +311,11 @@ Updating is optional. Older installed versions do not expire just because a newe
 
 ![Item Lookup](docs/images/RALM4.jpg)
 
-## Export
+## Settings
 
 ![Settings](docs/images/RALM5.jpg)
 
-## Settings
+## Additional Workspace View
 
 ![EverQuest Research and Loot Tool](docs/images/RALM6.jpg)
 
@@ -418,22 +418,21 @@ Stable releases are published through GitHub Releases.
 
 ---
 
-# What's New in v0.16.5
+# What's New in v0.16.6
 
-v0.16.5 is a small updater-state hotfix.
+v0.16.6 focuses on Live Loot reliability, session handling, sync robustness, and UI responsiveness.
 
-It fixes the Application Updates screen remaining stuck on **RESTARTING** after an otherwise successful update.
+Highlights:
 
-The updater now:
-
-- remembers the target version
-- detects when the companion returns
-- confirms the new version is running
-- changes the status to **UPDATE COMPLETE**
-- reloads the previous update result
-- restores normal update controls automatically
-
-No Live Loot, Research, session, shortcut, or updater-installation behavior changed from v0.16.4.
+- fixes **End Current Loot Session** so old loot does not return after clearing
+- adds an authoritative EQ log byte watermark for fresh-session boundaries
+- adds backend session IDs and stale-write rejection
+- improves long-session Live Loot responsiveness
+- makes Researchable Spells icons appear faster
+- adds cache-control protections so new builds do not reuse stale browser code
+- makes Bastion Research corpus syncing safe while the application remains open
+- writes synced Research data atomically with retry handling for transient Windows file locks
+- retains the v0.16.5 updater restart-status fix
 
 For the complete version history, see:
 
