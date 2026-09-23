@@ -168,7 +168,7 @@ function Initialize-ZoneFromTail {
             $sr=New-Object IO.StreamReader($fs)
             try{$text=$sr.ReadToEnd()}finally{$sr.Dispose()}
         }finally{$fs.Dispose()}
-        foreach($line in ($text -split "`r?`n")){Update-ZoneContextFromLine $line}
+        foreach($line in ($text -split "`r?`n")){Update-CorpseRecoveryContextFromLine $line;Update-ZoneContextFromLine $line}
     }catch{}
 }
 function Parse-LootLine([string]$line){
