@@ -2,7 +2,7 @@
 
 A local Windows companion for the **Bastion EverQuest server** that combines live loot monitoring, spell Research planning, Bastion Magelo inventory mapping, item lookup, session tracking, and safe self-updating.
 
-**Current stable release: v0.16.6**
+**Current stable release: v0.16.7-demo.1**
 
 > Built for EverQuest players who want to know, in real time, whether a drop matters for Research — and whether they already have what they need to make a spell.
 
@@ -418,27 +418,15 @@ Stable releases are published through GitHub Releases.
 
 ---
 
-# What's New in v0.16.6
 
-v0.16.6 focuses on Live Loot reliability, session handling, sync robustness, and UI responsiveness.
 
-Highlights:
+# What's New in v0.17.0
 
-- fixes **End Current Loot Session** so old loot does not return after clearing
-- adds an authoritative EQ log byte watermark for fresh-session boundaries
-- adds backend session IDs and stale-write rejection
-- improves long-session Live Loot responsiveness
-- makes Researchable Spells icons appear faster
-- adds cache-control protections so new builds do not reuse stale browser code
-- makes Bastion Research corpus syncing safe while the application remains open
-- writes synced Research data atomically with retry handling for transient Windows file locks
-- retains the v0.16.5 updater restart-status fix
-
-For the complete version history, see:
-
-[docs/CHANGELOG.md](docs/CHANGELOG.md)
-
----
+- Live zone tracking, including exact instanced-zone identity.
+- Dedicated Observed Loot History workspace with permanent monthly archives.
+- Archive-aware history search and optional recording toggle.
+- Dedicated Live Event, persistence, and history-index workers to protect Live Loot responsiveness.
+- Session reset, updater, Bastion sync, and spell-icon reliability improvements retained.
 
 # Project
 

@@ -1,8 +1,16 @@
 <!DOCTYPE html>
 
 <html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/>
-<title>EverQuest Research &amp; Loot Tool</title><link href="styles.css?v=0.16.6" rel="stylesheet"/></head><body>
-<header class="app-hero"><div class="hero-shell"><div class="brand-mark" aria-hidden="true"><span class="brand-mark-star">✦</span><span class="brand-mark-ring"></span></div><div class="brand-copy"><div class="eyebrow">EVERQUEST RESEARCH &amp; LOOT TOOL <span class="byline">by Bromm</span></div><h1><span>Spell Research Assistant</span><span class="title-join">&amp;</span><span class="title-accent">Live Loot Monitor</span></h1><p>Track drops as they happen, locate useful components, and turn your inventory into research-ready spells.</p><div class="hero-badges" aria-label="Primary tools"><span><i class="hero-dot live"></i>Live Loot</span><span>Inventory Mapping</span><span>Spell Research</span></div></div><div class="header-actions"><div class="version">v0.16.6</div><button aria-label="Open Settings" class="settings-button" id="openSettings" type="button">⚙ Settings<span class="settings-update-dot hidden" id="settingsUpdateDot" title="Update available" aria-label="Update available"></span></button></div></div></header>
+<title>EverQuest Research &amp; Loot Tool</title><link href="styles.css?v=0.17.0" rel="stylesheet"/></head><body>
+<header class="app-hero"><div class="hero-shell"><div class="brand-mark" aria-hidden="true"><span class="brand-mark-star">✦</span><span class="brand-mark-ring"></span></div><div class="brand-copy"><div class="eyebrow">EVERQUEST RESEARCH &amp; LOOT TOOL <span class="byline">by Bromm</span></div><h1><span>Spell Research Assistant</span><span class="title-join">&amp;</span><span class="title-accent">Live Loot Monitor</span></h1><p>Track drops as they happen, locate useful components, and turn your inventory into research-ready spells.</p><div class="hero-badges" aria-label="Primary tools"><span><i class="hero-dot live"></i>Live Loot</span><span>Inventory Mapping</span><span>Spell Research</span></div></div><div class="header-actions"><div class="version">v0.17.0</div><button aria-label="Open Settings" class="settings-button" id="openSettings" type="button">⚙ Settings<span class="settings-update-dot hidden" id="settingsUpdateDot" title="Update available" aria-label="Update available"></span></button></div></div></header>
+<nav class="app-workspace-nav" aria-label="Application workspaces">
+<div class="workspace-nav-inner">
+<button class="workspace-nav-button active" id="navHome" type="button" aria-current="page">Live &amp; Research</button>
+<button class="workspace-nav-button" id="navHistory" type="button">Observed History <span class="nav-history-count" id="navHistoryCount">0</span></button>
+</div>
+</nav>
+
+<div id="homeWorkspace" class="app-workspace active">
 <section class="quick-lookup-bar"><div class="quick-inner">
 <div><strong>Quick Loot Lookup</strong><small>What did you just find?</small></div>
 <input id="quickLootSearch" placeholder="Type item name or item ID…"/><button id="quickLootButton">Find Research Uses</button>
@@ -14,7 +22,7 @@
 <section class="panel live-panel">
 <div class="panel-title">
 <div><div class="eyebrow panel-kicker">LIVE ACTIVITY</div><h2>Live Loot Monitor</h2><p id="liveMonitorSummary">Watch every drop in real time. Useful Research pieces are identified automatically. <span id="liveOwnershipSummary">Tracked loot counts provisionally until Magelo confirms it.</span></p></div>
-<div class="live-heading-status"><div class="live-log-badge" id="liveLogBadge" title="Active EverQuest log"><span class="live-log-mark">LOG</span><span id="liveLogName">Not connected</span></div><div class="live-status offline" id="liveStatus">OFFLINE</div></div>
+<div class="live-heading-status"><div class="latency-badge hidden" id="liveLatencyBadge" title="Measured from the EQ log timestamp to browser receipt; hover for timestamp→companion and companion→browser timing"><span class="latency-mark">LATENCY</span><span id="liveLatencyValue">—</span></div><div class="zone-badge" id="currentZoneBadge" title="Current zone from EverQuest log"><span class="zone-mark">ZONE</span><span id="currentZoneName">Unknown zone</span></div><div class="live-log-badge" id="liveLogBadge" title="Active EverQuest log"><span class="live-log-mark">LOG</span><span id="liveLogName">Not connected</span></div><div class="live-status offline" id="liveStatus">OFFLINE</div></div>
 </div>
 
 
@@ -36,6 +44,21 @@
 <div class="craftable-alerts" id="craftableAlerts"></div>
 </section>
 
+
+
+<section class="panel home-history-card" id="homeHistoryCard">
+<div>
+<div class="eyebrow panel-kicker">OBSERVED HISTORY</div>
+<h2>Loot History is Recording</h2>
+<p>Permanent zone-stamped observations are being archived in the background without crowding the live workspace.</p>
+</div>
+<div class="home-history-stats">
+<div><strong id="homeHistoryEvents">0</strong><span>observations</span></div>
+<div><strong id="homeHistoryZones">0</strong><span>zones</span></div>
+<div><strong id="homeHistoryItems">0</strong><span>unique items</span></div>
+<button id="openHistoryWorkspace" type="button">Open History</button>
+</div>
+</section>
 <section class="setup-workspace">
 <section class="panel magelo-panel workspace-card inventory-card">
 <div class="panel-title">
@@ -86,7 +109,41 @@
 <div class="reverse-results" id="reverseResults"></div>
 </section>
 
-</main><footer>Offline tool • Your inventory stays on your computer</footer>
+</main>
+</div>
+<section id="historyWorkspace" class="app-workspace history-workspace hidden" aria-label="Observed Loot History workspace">
+<div class="history-page-heading">
+<div><div class="eyebrow">HISTORY WORKSPACE</div><h1>Observed Loot History</h1><p>Explore permanent loot observations across monthly archives without loading the full history database into the live workspace.</p></div>
+<button class="ghost" id="backToLiveWorkspace" type="button">← Back to Live &amp; Research</button>
+</div>
+<section class="panel history-panel" id="observedLootHistoryPanel">
+<div class="panel-title history-title">
+<div><div class="eyebrow panel-kicker">OBSERVED LOOT HISTORY</div><h2>Zone &amp; Loot History</h2><p>Permanent local observations from your Bastion logs. This records what your logs observed; it is not presented as an authoritative server drop table.</p></div>
+<div class="history-actions"><button class="ghost" id="refreshLootHistory" type="button">Refresh History</button><button class="ghost" id="exportLootHistory" type="button">Export CSV</button></div>
+</div>
+<div class="history-current-zone"><span>Current zone</span><strong id="historyCurrentZone">Unknown</strong><small id="historyInstanceText">Waiting for a zone-entry line.</small><small id="historyStorageStatus">History storage status will appear here.</small></div>
+<div class="history-filter-grid">
+<label><span>Item</span><input id="historyItemFilter" placeholder="Filter item name..."/></label>
+<label><span>Zone</span><select id="historyZoneFilter"><option value="ALL">All zones</option></select></label>
+<label><span>Looter</span><select id="historyLooterFilter"><option value="ALL">All looters</option></select></label>
+<label><span>Type</span><select id="historyValueFilter"><option value="ALL">All loot</option><option value="RESEARCH">Research related</option><option value="HIGH VALUE">High value</option><option value="KEEP">Keep</option><option value="UNKNOWN">Unknown Research</option><option value="OTHER">Other</option></select></label>
+</div>
+<div class="history-metrics">
+<article><span>Observed events</span><strong id="historyEventCount">0</strong></article>
+<article><span>Unique items</span><strong id="historyItemCount">0</strong></article>
+<article><span>Zones observed</span><strong id="historyZoneCount">0</strong></article>
+<article><span>Research related</span><strong id="historyResearchCount">0</strong></article>
+</div>
+<div class="history-summary-grid">
+<div><h3>Top Zones</h3><div id="historyZoneSummary" class="history-summary-list"><p class="muted">No observed history yet.</p></div></div>
+<div><h3>Top Items</h3><div id="historyItemSummary" class="history-summary-list"><p class="muted">No observed history yet.</p></div></div>
+</div>
+<div class="history-results-head"><h3>Observed Events</h3><span class="muted" id="historyResultStatus">No history loaded.</span></div>
+<div class="history-results" id="historyResults"><p class="muted">No observed loot history yet.</p></div>
+</section>
+</section>
+
+<footer>Offline tool • Your inventory stays on your computer</footer>
 
 <div aria-hidden="true" class="modal-backdrop hidden" id="lootUseModal"><div aria-modal="true" class="loot-modal" role="dialog"><div class="loot-modal-head"><div><div class="eyebrow">RESEARCH COMPONENT</div><h2 id="lootUseTitle">Research Uses</h2><div class="muted" id="lootUseSubtitle"></div></div><button aria-label="Close popup" class="ghost modal-close" id="closeLootUseModal" type="button">×</button></div><div class="loot-use-body" id="lootUseBody"></div></div></div>
 <div class="update-toast hidden" id="updateAvailableToast" role="status" aria-live="polite"><div><strong id="updateToastTitle">Update available</strong><span id="updateToastText">A newer stable release is ready.</span></div><div class="update-toast-actions"><button type="button" id="viewAvailableUpdate">View Update</button><button type="button" class="ghost" id="dismissAvailableUpdate">Later</button></div></div>
@@ -120,12 +177,19 @@
 <span id="spellMetadataStatus">Packaged metadata loaded. Full Bastion class/level sync not checked yet.</span>
 </div>
 <button id="syncSpellMetadata">Sync Spell Class / Level Data</button>
-</div></section><section class="settings-section" id="applicationUpdatesSettings"><div class="settings-section-title"><h3>Application Updates</h3><p>Stable releases are downloaded from GitHub, SHA-256 verified, backed up, installed, and restarted through the local companion.</p><span class="live-status offline" id="updateStatusBadge">NOT CHECKED</span></div><div class="update-actions">
+</div></section><section class="settings-section" id="observedHistorySettings"><div class="settings-section-title"><h3>Observed Loot History</h3><p>Permanent local observations are ON by default. Turning this off stops new archival records and hides the history workspace, but never deletes existing history.</p></div>
+<div class="settings-control-grid">
+<label class="toggle-row"><span><strong>Record Observed Loot History</strong><small>Keep zone-stamped loot observations in monthly archive files.</small></span><input id="observedHistoryEnabled" type="checkbox" checked/></label>
+</div>
+<div class="status muted" id="observedHistorySettingsStatus">History recording is enabled.</div>
+<div class="update-actions"><button class="ghost" id="rebuildHistoryIndex" type="button">Rebuild History Index</button></div>
+</section>
+<section class="settings-section" id="applicationUpdatesSettings"><div class="settings-section-title"><h3>Application Updates</h3><p>Stable releases are downloaded from GitHub, SHA-256 verified, backed up, installed, and restarted through the local companion.</p><span class="live-status offline" id="updateStatusBadge">NOT CHECKED</span></div><div class="update-actions">
 <button id="checkForUpdates">Check for Updates</button>
 <button class="ghost" disabled="" id="downloadLatestUpdate">Download &amp; Verify Update</button>
 <button class="danger" disabled="" id="installVerifiedUpdate">Install Update</button>
 <a class="button-link ghost hidden" href="#" id="openReleasePage" rel="noopener" target="_blank">Open Release Page ↗</a>
 </div><div class="update-version-grid" id="updateVersionGrid">
-<div><span>Installed version</span><strong id="installedAppVersion">v0.16.6</strong></div>
+<div><span>Installed version</span><strong id="installedAppVersion">v0.17.0</strong></div>
 <div><span>Latest stable</span><strong id="latestStableVersion">Not checked</strong></div>
-</div><div class="status muted" id="updateStatus">Updater ready. Check GitHub for a newer stable release.</div><div class="update-result-card hidden" id="previousUpdateResult"></div><div class="update-backup-summary hidden" id="backupSummary"></div><div class="update-progress hidden" id="updateProgress"><div id="updateProgressBar"></div></div><div class="update-release-notes hidden" id="updateReleaseNotes"></div></section><section class="settings-section"><div class="settings-section-title"><h3>Advanced / Data Tools</h3><p>Evidence queue and dataset diagnostics intended for troubleshooting and data maintenance.</p></div><div class="advanced-grid"><div><h3>Research Evidence Queue</h3><div id="evidenceQueue"></div></div><div><h3>Dataset Audit</h3><div class="summary-grid" id="auditCards"></div><div id="auditDetails"></div></div></div></section></div></section></div><script src="data/recipes.js?v=0.16.6"></script><script src="data/bastion-recipes.js?v=0.16.6"></script><script src="data/spell-catalog.js?v=0.16.6"></script><script src="data/spell-icons.js?v=0.16.6"></script><script src="app.js?v=0.16.6"></script><script src="settings.js?v=0.16.6"></script></body></html>
+</div><div class="status muted" id="updateStatus">Updater ready. Check GitHub for a newer stable release.</div><div class="update-result-card hidden" id="previousUpdateResult"></div><div class="update-backup-summary hidden" id="backupSummary"></div><div class="update-progress hidden" id="updateProgress"><div id="updateProgressBar"></div></div><div class="update-release-notes hidden" id="updateReleaseNotes"></div></section><section class="settings-section"><div class="settings-section-title"><h3>Advanced / Data Tools</h3><p>Evidence queue and dataset diagnostics intended for troubleshooting and data maintenance.</p></div><div class="advanced-grid"><div><h3>Research Evidence Queue</h3><div id="evidenceQueue"></div></div><div><h3>Dataset Audit</h3><div class="summary-grid" id="auditCards"></div><div id="auditDetails"></div></div></div></section></div></section></div><script src="data/recipes.js?v=0.17.0"></script><script src="data/bastion-recipes.js?v=0.17.0"></script><script src="data/spell-catalog.js?v=0.17.0"></script><script src="data/spell-icons.js?v=0.17.0"></script><script src="app.js?v=0.17.0"></script><script src="settings.js?v=0.17.0"></script></body></html>

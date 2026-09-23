@@ -8,6 +8,52 @@ $userDataRoot = Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"
 if(-not (Test-Path -LiteralPath $userDataRoot)){New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null}
 $sessionStatePath = Join-Path $userDataRoot "session-loot.jsonl"
 $sessionMetaPath = Join-Path $userDataRoot "session-meta.json"
+$lootHistoryRoot = Join-Path $userDataRoot "history"
+if(-not(Test-Path -LiteralPath $lootHistoryRoot)){New-Item -ItemType Directory -Path $lootHistoryRoot -Force | Out-Null}
+$lootHistoryIndexPath = Join-Path $lootHistoryRoot "loot-history-index.json"
+$legacyLootHistoryPath = Join-Path $userDataRoot "loot-history.jsonl"
+$historyIndexWorkerScript = Join-Path $root "history-index-worker.ps1"
+$persistenceWorkerScript = Join-Path $root "persistence-worker.ps1"
+$liveEventWorkerScript = Join-Path $root "live-event-worker.ps1"
+$script:liveEventWorkerProcess=$null
+function Start-LiveEventWorker {
+    try{
+        if(Test-Path -LiteralPath $liveEventWorkerScript){
+            $script:liveEventWorkerProcess=Start-Process powershell.exe -WindowStyle Hidden -PassThru -ArgumentList @(
+                "-NoProfile","-ExecutionPolicy","Bypass","-File",$liveEventWorkerScript,
+                "-ParentPid",$PID
+            )
+        }
+    }catch{}
+}
+
+$script:persistenceWorkerProcess=$null
+function Start-PersistenceWorker {
+    try{
+        if(Test-Path -LiteralPath $persistenceWorkerScript){
+            $script:persistenceWorkerProcess=Start-Process powershell.exe -WindowStyle Hidden -PassThru -ArgumentList @(
+                "-NoProfile","-ExecutionPolicy","Bypass","-File",$persistenceWorkerScript,
+                "-ParentPid",$PID
+            )
+        }
+    }catch{}
+}
+
+$script:historyIndexWorkerProcess=$null
+function Start-HistoryIndexWorker {
+    try{
+        if(Test-Path -LiteralPath $historyIndexWorkerScript){
+            $script:historyIndexWorkerProcess=Start-Process powershell.exe -WindowStyle Hidden -PassThru -ArgumentList @(
+                "-NoProfile","-ExecutionPolicy","Bypass","-File",$historyIndexWorkerScript,
+                "-ParentPid",$PID
+            )
+        }
+    }catch{}
+}
+
+$script:historyIndexCache=$null
+$script:historyIndexDirty=$false
+$script:lastHistoryIndexFlush=Get-Date
 $trayPidPath = Join-Path $userDataRoot "tray.pid"
 $shutdownRequestPath = Join-Path $userDataRoot "shutdown-for-update.request"
 $suppressBrowserPath = Join-Path $userDataRoot "suppress-browser-once.request"
@@ -20,6 +66,7 @@ function Get-Config {
         logPath = ""
         port = 8765
         startAtEnd = $true
+        observedLootHistoryEnabled = $true
     }
 }
 function Save-Config($cfg) {$cfg | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $configPath -Encoding UTF8}
@@ -74,7 +121,7 @@ function Strip-Html([string]$html) {
     return ([regex]::Replace($x,'\s+',' ')).Trim()
 }
 function Invoke-Bastion([string]$url) {
-    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Research-Loot-Tool/0.16.6"}).Content
+    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Research-Loot-Tool/0.17.0"}).Content
 }
 function Parse-RecipePage([int]$id,[string]$html) {
     $plain=Strip-Html $html
@@ -237,6 +284,7 @@ $config=Get-Config
 if($LogPath){$config.logPath=$LogPath}
 if(-not $config.port){$config | Add-Member -NotePropertyName port -NotePropertyValue 8765 -Force}
 if($null -eq $config.startAtEnd){$config | Add-Member -NotePropertyName startAtEnd -NotePropertyValue $true -Force}
+if($null -eq $config.observedLootHistoryEnabled){$config | Add-Member -NotePropertyName observedLootHistoryEnabled -NotePropertyValue $true -Force;Save-Config $config}
 $port=[int]$config.port
 
 if(-not $config.logPath -or -not (Test-Path -LiteralPath $config.logPath)){
@@ -248,6 +296,84 @@ $logPath=[string]$config.logPath
 $logFileName=[IO.Path]::GetFileName($logPath)
 $character=""
 if($logFileName -match '^eqlog_(.+?)_[^_]+\.txt$'){$character=$Matches[1]}
+
+$script:currentZone=""
+$script:currentZoneId=$null
+$script:currentInstanceId=$null
+$script:currentZoneVersion=$null
+$script:currentZoneEnteredAt=$null
+$script:lastZoneEntryLogTime=$null
+$script:currentZoneIsGenericInstance=$false
+
+function Test-GenericInstanceZoneName([string]$zone) {
+    if([string]::IsNullOrWhiteSpace($zone)){return $false}
+    $z=$zone.Trim()
+    return [regex]::IsMatch($z,'^(?:a|an)?\s*instanced\s+version\s+of\s+(?:the\s+)?zone$','IgnoreCase')
+}
+function Parse-EqLogTime([string]$value) {
+    if([string]::IsNullOrWhiteSpace($value)){return $null}
+    try{return [DateTime]::Parse($value,[Globalization.CultureInfo]::InvariantCulture)}catch{}
+    try{return [DateTime]::Parse($value)}catch{}
+    return $null
+}
+function Update-ZoneContextFromLine([string]$line) {
+    if(-not $line){return $false}
+    $m=[regex]::Match($line,'^\[(?<time>[^\]]+)\]\s*You have entered (?<zone>.+?)\.\s*$')
+    if($m.Success){
+        $zone=$m.Groups['zone'].Value.Trim()
+        $script:currentZone=$zone
+        $script:currentZoneId=$null
+        $script:currentInstanceId=$null
+        $script:currentZoneVersion=$null
+        $script:currentZoneEnteredAt=$m.Groups['time'].Value
+        $script:lastZoneEntryLogTime=Parse-EqLogTime $m.Groups['time'].Value
+        $script:currentZoneIsGenericInstance=Test-GenericInstanceZoneName $zone
+        return $true
+    }
+
+    $m=[regex]::Match($line,'^\[(?<time>[^\]]+)\]\s*PID \(\d+\)\s+(?<zone>.+?)\s+\((?<zoneId>\d+)\)\s+\(Instance ID (?<instanceId>\d+)\)\s+\(Version (?<version>\d+)\)')
+    if($m.Success){
+        $zone=$m.Groups['zone'].Value.Trim()
+        $pidTime=Parse-EqLogTime $m.Groups['time'].Value
+        $nearZoneTransition=$false
+        if($pidTime -and $script:lastZoneEntryLogTime){
+            try{$nearZoneTransition=([Math]::Abs(($pidTime-$script:lastZoneEntryLogTime).TotalSeconds) -le 30)}catch{}
+        }
+        $sameZone=([string]::Equals([string]$script:currentZone,$zone,[StringComparison]::OrdinalIgnoreCase))
+        if(-not $script:currentZone -or $script:currentZoneIsGenericInstance -or $sameZone -or $nearZoneTransition){
+            $script:currentZone=$zone
+            $script:currentZoneId=[int]$m.Groups['zoneId'].Value
+            $script:currentInstanceId=[int]$m.Groups['instanceId'].Value
+            $script:currentZoneVersion=[int]$m.Groups['version'].Value
+            $script:currentZoneIsGenericInstance=$false
+        }
+        return $true
+    }
+    return $false
+}
+
+function Initialize-ZoneContextFromLog {
+    if(-not $logPath -or -not(Test-Path -LiteralPath $logPath)){return}
+    try{
+        $fi=Get-Item -LiteralPath $logPath
+        $tailBytes=[Math]::Min([int64](16MB),[int64]$fi.Length)
+        if($tailBytes -le 0){return}
+        $fs=New-Object IO.FileStream($logPath,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
+        try{
+            [void]$fs.Seek(-$tailBytes,[IO.SeekOrigin]::End)
+            $sr=New-Object IO.StreamReader($fs)
+            try{$text=$sr.ReadToEnd()}finally{$sr.Dispose()}
+        }finally{$fs.Dispose()}
+
+        # Process the tail sequentially so an instance PID following the latest
+        # "You have entered ..." line enriches that zone rather than an older one.
+        foreach($line in ($text -split "`r?`n")){
+            [void](Update-ZoneContextFromLine $line)
+        }
+    }catch{}
+}
+
+Initialize-ZoneContextFromLog
 
 $events=New-Object System.Collections.ArrayList
 $nextId=1
@@ -264,12 +390,12 @@ function Parse-LootLine([string]$line) {
     if(-not $line){return $null}
     $m=[regex]::Match($line,'^\[(?<time>[^\]]+)\]\s*--You have looted (?:a|an) (?<item>.+?)\.--\s*$')
     if($m.Success){
-        return [pscustomobject]@{timestamp=$m.Groups['time'].Value;looter=$(if($character){$character}else{"You"});self=$true;item=$m.Groups['item'].Value;raw=$line}
+        return [pscustomobject]@{timestamp=$m.Groups['time'].Value;looter=$(if($character){$character}else{"You"});self=$true;item=$m.Groups['item'].Value;zone=$script:currentZone;zoneId=$script:currentZoneId;instanceId=$script:currentInstanceId;zoneVersion=$script:currentZoneVersion;raw=$line}
     }
     $m=[regex]::Match($line,'^\[(?<time>[^\]]+)\]\s*--(?<looter>.+?) has looted (?:a|an) (?<item>.+?)\.--\s*$')
     if($m.Success){
         $l=$m.Groups['looter'].Value
-        return [pscustomobject]@{timestamp=$m.Groups['time'].Value;looter=$l;self=$(if($character -and $l -eq $character){$true}else{$false});item=$m.Groups['item'].Value;raw=$line}
+        return [pscustomobject]@{timestamp=$m.Groups['time'].Value;looter=$l;self=$(if($character -and $l -eq $character){$true}else{$false});item=$m.Groups['item'].Value;zone=$script:currentZone;zoneId=$script:currentZoneId;instanceId=$script:currentInstanceId;zoneVersion=$script:currentZoneVersion;raw=$line}
     }
     return $null
 }
@@ -297,8 +423,13 @@ function Read-NewLoot {
         if($parts.Count -gt 1){$parts=$parts[0..($parts.Count-2)]}else{$parts=@()}
     }else{$carry=""}
     foreach($line in $parts){
+        [void](Update-ZoneContextFromLine $line)
         $evt=Parse-LootLine $line
-        if($evt){$evt|Add-Member -NotePropertyName id -NotePropertyValue $nextId -Force;[void]$events.Add($evt);$nextId++}
+        if($evt){
+            $evt|Add-Member -NotePropertyName id -NotePropertyValue $nextId -Force
+            $evt|Add-Member -NotePropertyName detectedAt -NotePropertyValue ((Get-Date).ToString("o")) -Force
+            [void]$events.Add($evt);$nextId++
+        }
     }
     while($events.Count -gt 1000){$events.RemoveAt(0)}
 }
@@ -520,7 +651,7 @@ function Convert-VersionCore([string]$version){
     return [version]("{0}.{1}.{2}" -f $parts[0],$parts[1],$parts[2])
 }
 function Get-LatestGitHubRelease {
-    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.6";"Accept"="application/vnd.github+json"}
+    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.17.0";"Accept"="application/vnd.github+json"}
     return Invoke-RestMethod -UseBasicParsing -Uri $updateApi -TimeoutSec 45 -Headers $headers
 }
 function Get-UpdateInfo {
@@ -560,7 +691,7 @@ function Download-AndVerifyLatestUpdate {
     $dest=Join-Path $updateStage $info.assetName
     $tmp=$dest+".download"
     if(Test-Path -LiteralPath $tmp){Remove-Item -LiteralPath $tmp -Force}
-    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.16.6"}
+    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.17.0"}
     try{
         Invoke-WebRequest -UseBasicParsing -Uri $info.assetUrl -OutFile $tmp -TimeoutSec 120 -Headers $headers
         $actual=(Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -661,11 +792,20 @@ try {
     $configPath=Join-Path $Root "monitor-config.json"
     if(Test-Path -LiteralPath $configPath){$preservedConfig=Get-Content -LiteralPath $configPath -Raw}
 
-    Write-UpdaterLog "Companion exited and package verified. Moving current application folder to backup."
-    Move-Item -LiteralPath $Root -Destination $BackupPath
+    Write-UpdaterLog "Companion exited and package verified. Copying current application contents to rollback backup."
+    if(Test-Path -LiteralPath $BackupPath){Remove-Item -LiteralPath $BackupPath -Recurse -Force -ErrorAction SilentlyContinue}
+    New-Item -ItemType Directory -Path $BackupPath -Force | Out-Null
+    Get-ChildItem -LiteralPath $Root -Force | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName -Destination $BackupPath -Recurse -Force
+    }
     $backupMade=$true
-    Write-UpdaterLog "Backup move completed. Installing replacement files."
-    New-Item -ItemType Directory -Path $Root | Out-Null
+
+    # Keep the active root directory itself in place. This avoids Windows
+    # Explorer following a renamed/moved install folder into the backup path.
+    Write-UpdaterLog "Backup copy completed. Replacing application contents in-place."
+    Get-ChildItem -LiteralPath $Root -Force | ForEach-Object {
+        Remove-Item -LiteralPath $_.FullName -Recurse -Force
+    }
     Get-ChildItem -LiteralPath $payload -Force | ForEach-Object {
         Move-Item -LiteralPath $_.FullName -Destination $Root -Force
     }
@@ -728,9 +868,14 @@ try {
     Write-UpdaterLog ("INSTALL FAILED: " + $message)
     try {
         if($backupMade -and (Test-Path -LiteralPath $BackupPath)){
-            if(Test-Path -LiteralPath $Root){Remove-Item -LiteralPath $Root -Recurse -Force -ErrorAction SilentlyContinue}
-            Move-Item -LiteralPath $BackupPath -Destination $Root
-            Write-UpdaterLog "Rollback restored the original application folder."
+            if(-not(Test-Path -LiteralPath $Root)){New-Item -ItemType Directory -Path $Root -Force | Out-Null}
+            Get-ChildItem -LiteralPath $Root -Force -ErrorAction SilentlyContinue | ForEach-Object {
+                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            Get-ChildItem -LiteralPath $BackupPath -Force | ForEach-Object {
+                Copy-Item -LiteralPath $_.FullName -Destination $Root -Recurse -Force
+            }
+            Write-UpdaterLog "Rollback restored the original application contents in-place."
         }
         $err=[pscustomobject]@{ok=$false;error=$message;failedAt=(Get-Date).ToString("o")} | ConvertTo-Json -Depth 4
         if(Test-Path -LiteralPath $Root){
@@ -822,6 +967,198 @@ $script:lastRejectedSessionId=$null
 $script:lastRejectedAt=$null
 Initialize-SessionIdentity
 
+
+
+function Normalize-HistoryKey([string]$value) {
+    if($null -eq $value){return ""}
+    return ([regex]::Replace($value.Trim().ToLowerInvariant(),'\s+',' '))
+}
+function Get-HistoryMonthKey($evt) {
+    $dt=$null
+    foreach($candidate in @($evt.recordedAt,$evt.historyRecordedAt,$evt.timestamp)){
+        if($candidate){try{$dt=[DateTime]::Parse([string]$candidate);break}catch{}}
+    }
+    if(-not $dt){$dt=Get-Date}
+    return $dt.ToString("yyyy-MM")
+}
+function Get-HistoryIndex {
+    if(Test-Path -LiteralPath $lootHistoryIndexPath){
+        try{
+            $fi=Get-Item -LiteralPath $lootHistoryIndexPath
+            $stamp=[string]$fi.LastWriteTimeUtc.Ticks
+            if($script:historyIndexCache -and $script:historyIndexCacheStamp -eq $stamp){return $script:historyIndexCache}
+            $x=Get-Content -LiteralPath $lootHistoryIndexPath -Raw|ConvertFrom-Json
+            if($x){
+                $script:historyIndexCache=$x
+                $script:historyIndexCacheStamp=$stamp
+                return $script:historyIndexCache
+            }
+        }catch{}
+    }
+    if(-not $script:historyIndexCache){
+        $script:historyIndexCache=[pscustomobject]@{schema=1;totalEvents=0;totalBytes=0;oldest=$null;newest=$null;months=[pscustomobject]@{};items=[pscustomobject]@{};zones=[pscustomobject]@{};looters=[pscustomobject]@{};updatedAt=$null}
+    }
+    return $script:historyIndexCache
+}
+function Flush-HistoryIndex([bool]$Force=$false) {
+    if(-not $script:historyIndexDirty -or -not $script:historyIndexCache){return}
+    $elapsed=((Get-Date)-$script:lastHistoryIndexFlush).TotalSeconds
+    if(-not $Force -and $elapsed -lt 5){return}
+    try{
+        $script:historyIndexCache.updatedAt=(Get-Date).ToString("o")
+        Write-AtomicUtf8File $lootHistoryIndexPath ($script:historyIndexCache|ConvertTo-Json -Depth 15)
+        $script:historyIndexDirty=$false
+        $script:lastHistoryIndexFlush=Get-Date
+    }catch{}
+}
+function Ensure-NoteProperty($obj,[string]$name,$value) {
+    if($null -eq $obj.PSObject.Properties[$name]){$obj|Add-Member -NotePropertyName $name -NotePropertyValue $value -Force}
+    return $obj.PSObject.Properties[$name].Value
+}
+function Add-MonthToArrayProperty($obj,[string]$name,[string]$month) {
+    $arr=@();if($obj.PSObject.Properties[$name]){$arr=@($obj.PSObject.Properties[$name].Value)}
+    if($arr -notcontains $month){$obj|Add-Member -NotePropertyName $name -NotePropertyValue @($arr+$month) -Force}
+}
+function Update-HistoryIndex($events,[hashtable]$monthBytes) {
+    $index=Get-HistoryIndex
+    foreach($n in @("months","items","zones","looters")){if($null -eq $index.PSObject.Properties[$n]){$index|Add-Member -NotePropertyName $n -NotePropertyValue ([pscustomobject]@{}) -Force}}
+    foreach($evt in @($events)){
+        if($null -eq $evt){continue}
+        $month=Get-HistoryMonthKey $evt
+        $index.totalEvents=[int64]$index.totalEvents+1
+        $when=[string]$(if($evt.timestamp){$evt.timestamp}else{$evt.recordedAt})
+        if(-not $index.oldest){$index.oldest=$when};$index.newest=$when
+        $mo=Ensure-NoteProperty $index.months $month ([pscustomobject]@{count=0;bytes=0});$mo.count=[int64]$mo.count+1
+        $ik=Normalize-HistoryKey ([string]$evt.item)
+        if($ik){
+            $io=Ensure-NoteProperty $index.items $ik ([pscustomobject]@{name=[string]$evt.item;count=0;firstSeen=$when;lastSeen=$when;months=@()})
+            $io.count=[int64]$io.count+1;if(-not $io.firstSeen){$io.firstSeen=$when};$io.lastSeen=$when;Add-MonthToArrayProperty $io "months" $month
+        }
+        $zone=[string]$(if($evt.zone){$evt.zone}else{"Unknown"});$zk=Normalize-HistoryKey $zone
+        $zo=Ensure-NoteProperty $index.zones $zk ([pscustomobject]@{name=$zone;count=0;months=@()});$zo.count=[int64]$zo.count+1;Add-MonthToArrayProperty $zo "months" $month
+        $looter=[string]$(if($evt.looter){$evt.looter}else{"Unknown"});$lk=Normalize-HistoryKey $looter
+        $lo=Ensure-NoteProperty $index.looters $lk ([pscustomobject]@{name=$looter;count=0;months=@()});$lo.count=[int64]$lo.count+1;Add-MonthToArrayProperty $lo "months" $month
+    }
+    foreach($m in $monthBytes.Keys){
+        $mo=Ensure-NoteProperty $index.months $m ([pscustomobject]@{count=0;bytes=0});$mo.bytes=[int64]$mo.bytes+[int64]$monthBytes[$m];$index.totalBytes=[int64]$index.totalBytes+[int64]$monthBytes[$m]
+    }
+    $index.updatedAt=(Get-Date).ToString("o")
+    $script:historyIndexCache=$index
+    $script:historyIndexDirty=$true
+}
+function Append-LootHistoryEvents($items) {
+    if($config.observedLootHistoryEnabled -eq $false){return 0}
+    $batch=@($items);if($batch.Count -eq 0){return 0}
+    $byMonth=@{}
+    foreach($evt in $batch){
+        if($null -eq $evt){continue}
+        if(-not $evt.historyId){$evt|Add-Member -NotePropertyName historyId -NotePropertyValue ([guid]::NewGuid().ToString("N")) -Force}
+        if(-not $evt.historyRecordedAt){$evt|Add-Member -NotePropertyName historyRecordedAt -NotePropertyValue ((Get-Date).ToString("o")) -Force}
+        $month=Get-HistoryMonthKey $evt
+        if(-not $byMonth.ContainsKey($month)){$byMonth[$month]=New-Object System.Collections.Generic.List[string]}
+        $byMonth[$month].Add(($evt|ConvertTo-Json -Depth 10 -Compress))
+    }
+    $bytes=@{};$written=0
+    foreach($month in $byMonth.Keys){
+        $path=Join-Path $lootHistoryRoot ("loot-history-"+$month+".jsonl");$lines=$byMonth[$month].ToArray()
+        if($lines.Count -gt 0){Add-Content -LiteralPath $path -Value $lines -Encoding UTF8;$written+=$lines.Count;$bytes[$month]=([Text.Encoding]::UTF8.GetByteCount(($lines -join "`r`n"))+2)}
+    }
+    # Raw observations are the source of truth. A separate worker watches the
+    # monthly archives and maintains the compact index out-of-process so Live
+    # Loot recognition is never blocked by index maintenance.
+    return $written
+}
+function Get-HistoryCandidateMonths([string]$item,[string]$zone,[string]$looter) {
+    $index=Get-HistoryIndex;$sets=New-Object System.Collections.ArrayList
+    if($item){
+        $q=Normalize-HistoryKey $item;$months=New-Object System.Collections.Generic.HashSet[string]
+        foreach($p in @($index.items.PSObject.Properties)){if($p.Name -like ("*"+$q+"*")){foreach($m in @($p.Value.months)){[void]$months.Add([string]$m)}}};[void]$sets.Add($months)
+    }
+    if($zone -and $zone -ne "ALL"){$k=Normalize-HistoryKey $zone;$months=New-Object System.Collections.Generic.HashSet[string];if($index.zones.PSObject.Properties[$k]){foreach($m in @($index.zones.PSObject.Properties[$k].Value.months)){[void]$months.Add([string]$m)}};[void]$sets.Add($months)}
+    if($looter -and $looter -ne "ALL"){$k=Normalize-HistoryKey $looter;$months=New-Object System.Collections.Generic.HashSet[string];if($index.looters.PSObject.Properties[$k]){foreach($m in @($index.looters.PSObject.Properties[$k].Value.months)){[void]$months.Add([string]$m)}};[void]$sets.Add($months)}
+    if($sets.Count -eq 0){return @(Get-ChildItem -LiteralPath $lootHistoryRoot -Filter "loot-history-????-??.jsonl" -File -ErrorAction SilentlyContinue|ForEach-Object{$_.BaseName.Substring(13)}|Sort-Object -Descending)}
+    $candidate=@($sets[0]);for($i=1;$i -lt $sets.Count;$i++){$candidate=@($candidate|Where-Object{$sets[$i].Contains($_)})};return @($candidate|Sort-Object -Descending)
+}
+function Test-HistoryEventFilter($evt,[string]$item,[string]$zone,[string]$looter,[string]$value) {
+    if($item -and (Normalize-HistoryKey ([string]$evt.item)) -notlike ("*"+(Normalize-HistoryKey $item)+"*")){return $false}
+    if($zone -and $zone -ne "ALL" -and [string]$evt.zone -ne $zone){return $false}
+    if($looter -and $looter -ne "ALL" -and [string]$evt.looter -ne $looter){return $false}
+    $rv=[string]$(if($evt.researchValue){$evt.researchValue}else{"OTHER"})
+    if($value -eq "RESEARCH"){if(-not(([int]$evt.verifiedUses -gt 0) -or $rv -in @("HIGH VALUE","KEEP","UNKNOWN"))){return $false}}
+    elseif($value -and $value -ne "ALL" -and $rv -ne $value){return $false}
+    return $true
+}
+function Get-LootHistory([int]$Limit=5000,[string]$item="",[string]$zone="ALL",[string]$looter="ALL",[string]$value="ALL") {
+    if($Limit -lt 1){$Limit=1};if($Limit -gt 10000){$Limit=10000}
+    $rows=New-Object System.Collections.ArrayList
+    foreach($month in (Get-HistoryCandidateMonths $item $zone $looter)){
+        if($rows.Count -ge $Limit){break}
+        $path=Join-Path $lootHistoryRoot ("loot-history-"+$month+".jsonl");if(-not(Test-Path -LiteralPath $path)){continue}
+        $lines=Get-Content -LiteralPath $path -ErrorAction SilentlyContinue
+        for($i=$lines.Count-1;$i -ge 0 -and $rows.Count -lt $Limit;$i--){if(-not [string]::IsNullOrWhiteSpace($lines[$i])){try{$evt=$lines[$i]|ConvertFrom-Json;if(Test-HistoryEventFilter $evt $item $zone $looter $value){[void]$rows.Add($evt)}}catch{}}}
+    }
+    $index=Get-HistoryIndex;$archiveCount=@(Get-ChildItem -LiteralPath $lootHistoryRoot -Filter "loot-history-????-??.jsonl" -File -ErrorAction SilentlyContinue).Count
+    return [pscustomobject]@{ok=$true;enabled=($config.observedLootHistoryEnabled -ne $false);events=@($rows);returned=$rows.Count;limit=$Limit;totalEvents=[int64]$index.totalEvents;totalItems=@($index.items.PSObject.Properties).Count;totalZones=@($index.zones.PSObject.Properties).Count;totalLooters=@($index.looters.PSObject.Properties).Count;totalBytes=[int64]$index.totalBytes;archiveCount=$archiveCount;oldest=$index.oldest;newest=$index.newest;historyRoot=$lootHistoryRoot}
+}
+function Rebuild-HistoryIndex {
+    try{
+        if($script:historyIndexWorkerProcess -and -not $script:historyIndexWorkerProcess.HasExited){
+            Stop-Process -Id $script:historyIndexWorkerProcess.Id -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 200
+        }
+    }catch{}
+
+    $workerStatePath=Join-Path $lootHistoryRoot "history-index-worker-state.json"
+    if(Test-Path -LiteralPath $workerStatePath){Remove-Item -LiteralPath $workerStatePath -Force -ErrorAction SilentlyContinue}
+    $script:historyIndexCache=$null
+    $script:historyIndexCacheStamp=$null
+    $script:historyIndexDirty=$false
+
+    $blank=[pscustomobject]@{schema=1;totalEvents=0;totalBytes=0;oldest=$null;newest=$null;months=[pscustomobject]@{};items=[pscustomobject]@{};zones=[pscustomobject]@{};looters=[pscustomobject]@{};updatedAt=$null}
+    Write-AtomicUtf8File $lootHistoryIndexPath ($blank|ConvertTo-Json -Depth 10)
+    $script:historyIndexCache=$blank
+
+    foreach($file in @(Get-ChildItem -LiteralPath $lootHistoryRoot -Filter "loot-history-????-??.jsonl" -File -ErrorAction SilentlyContinue|Sort-Object Name)){
+        $events=New-Object System.Collections.ArrayList
+        foreach($line in (Get-Content -LiteralPath $file.FullName -ErrorAction SilentlyContinue)){
+            if(-not [string]::IsNullOrWhiteSpace($line)){try{[void]$events.Add(($line|ConvertFrom-Json))}catch{}}
+        }
+        $mb=@{}
+        $mb[$file.BaseName.Substring(13)]=$file.Length
+        if($events.Count -gt 0){Update-HistoryIndex @($events) $mb}
+    }
+    Flush-HistoryIndex $true
+    $result=Get-HistoryIndex
+    Start-HistoryIndexWorker
+    return $result
+}
+
+
+function Migrate-LegacyLootHistory {
+    if(-not(Test-Path -LiteralPath $legacyLootHistoryPath)){return}
+    $backup=$legacyLootHistoryPath+".migrated-v0.17.0.bak"
+    try{
+        $events=New-Object System.Collections.ArrayList
+        foreach($line in (Get-Content -LiteralPath $legacyLootHistoryPath -ErrorAction Stop)){
+            if(-not [string]::IsNullOrWhiteSpace($line)){try{[void]$events.Add(($line|ConvertFrom-Json))}catch{}}
+        }
+        if($events.Count -gt 0){
+            $wasEnabled=$config.observedLootHistoryEnabled
+            try{
+                $config.observedLootHistoryEnabled=$true
+                [void](Append-LootHistoryEvents @($events))
+            }finally{
+                $config.observedLootHistoryEnabled=$wasEnabled
+            }
+        }
+        if(Test-Path -LiteralPath $backup){Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue}
+        Move-Item -LiteralPath $legacyLootHistoryPath -Destination $backup -Force
+    }catch{
+        # Preserve the original file untouched if migration cannot complete.
+    }
+}
+Migrate-LegacyLootHistory
+
 function Get-SessionState {
     $base=[ordered]@{
         ok=$true
@@ -870,7 +1207,8 @@ function Append-SessionEvent($evt,[string]$clientSessionId) {
     $evt | Add-Member -NotePropertyName sessionId -NotePropertyValue ([string]$script:sessionId) -Force
     $line=$evt|ConvertTo-Json -Depth 8 -Compress
     Add-Content -LiteralPath $sessionStatePath -Value $line -Encoding UTF8
-    return [pscustomobject]@{ok=$true;count=1;sessionId=[string]$script:sessionId;path=$sessionStatePath}
+    $historyCount=Append-LootHistoryEvents @($evt)
+    return [pscustomobject]@{ok=$true;count=1;historyCount=$historyCount;sessionId=[string]$script:sessionId;path=$sessionStatePath}
 }
 function Append-SessionEvents($items,[string]$clientSessionId) {
     $batch=@($items)
@@ -883,7 +1221,8 @@ function Append-SessionEvents($items,[string]$clientSessionId) {
         $lines.Add(($evt|ConvertTo-Json -Depth 8 -Compress))
     }
     if($lines.Count -gt 0){Add-Content -LiteralPath $sessionStatePath -Value $lines.ToArray() -Encoding UTF8}
-    return [pscustomobject]@{ok=$true;count=$lines.Count;sessionId=[string]$script:sessionId;path=$sessionStatePath}
+    $historyCount=Append-LootHistoryEvents $batch
+    return [pscustomobject]@{ok=$true;count=$lines.Count;historyCount=$historyCount;sessionId=[string]$script:sessionId;path=$sessionStatePath}
 }
 function Clear-SessionState([string]$clientSessionId) {
     if(-not(Test-SessionIdentity $clientSessionId)){return Register-StaleSessionWrite $clientSessionId 0}
@@ -926,15 +1265,18 @@ function Clear-SessionState([string]$clientSessionId) {
     }
 }
 
+Start-HistoryIndexWorker
+Start-PersistenceWorker
+Start-LiveEventWorker
+
 $shutdownForUpdate=$false
 $listener=New-Object Net.HttpListener;$prefix="http://127.0.0.1:$port/";$listener.Prefixes.Add($prefix);$listener.Start()
-Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.16.6";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
+Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.17.0";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
 
 try{
 while($listener.IsListening){
-    Read-NewLoot
     $task=$listener.GetContextAsync()
-    while(-not$task.Wait(250)){Read-NewLoot}
+    while(-not$task.Wait(250)){}
     $ctx=$task.Result;$req=$ctx.Request;$res=$ctx.Response
     $res.Headers["Access-Control-Allow-Origin"]="*"
     $res.Headers["Access-Control-Allow-Methods"]="GET, POST, OPTIONS"
@@ -978,6 +1320,54 @@ while($listener.IsListening){
             $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
         }
 
+        if($path -eq "/api/loot-history-summary"){
+            try{
+                $index=Get-HistoryIndex
+                $archiveCount=@(Get-ChildItem -LiteralPath $lootHistoryRoot -Filter "loot-history-????-??.jsonl" -File -ErrorAction SilentlyContinue).Count
+                $payload=[pscustomobject]@{
+                    ok=$true
+                    enabled=($config.observedLootHistoryEnabled -ne $false)
+                    totalEvents=[int64]$index.totalEvents
+                    totalItems=@($index.items.PSObject.Properties).Count
+                    totalZones=@($index.zones.PSObject.Properties).Count
+                    totalLooters=@($index.looters.PSObject.Properties).Count
+                    totalBytes=[int64]$index.totalBytes
+                    archiveCount=$archiveCount
+                    oldest=$index.oldest
+                    newest=$index.newest
+                }|ConvertTo-Json -Depth 6
+            }catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
+            $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
+        }
+        if($path -eq "/api/loot-history"){
+            try{
+                $limit=5000
+                [void][int]::TryParse($req.QueryString["limit"],[ref]$limit)
+                $item=[string]$req.QueryString["item"]
+                $zone=[string]$req.QueryString["zone"]
+                $looter=[string]$req.QueryString["looter"]
+                $value=[string]$req.QueryString["value"]
+                $payload=(Get-LootHistory $limit $item $zone $looter $value|ConvertTo-Json -Depth 12)
+            }catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
+            $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
+        }
+        if($path -eq "/api/loot-history-setting"){
+            try{
+                if($req.HttpMethod -eq "POST"){
+                    $body=Read-RequestJson $req
+                    $config.observedLootHistoryEnabled=[bool]$body.enabled
+                    Save-Config $config
+                }
+                $payload=[pscustomobject]@{ok=$true;enabled=($config.observedLootHistoryEnabled -ne $false)}|ConvertTo-Json
+            }catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
+            $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
+        }
+        if($path -eq "/api/loot-history-rebuild-index"){
+            try{$payload=[pscustomobject]@{ok=$true;index=(Rebuild-HistoryIndex)}|ConvertTo-Json -Depth 20}
+            catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
+            $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
+        }
+
         if($path -eq "/api/update-state"){
             try{$payload=(Get-UpdateState | ConvertTo-Json -Depth 8)}
             catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
@@ -1001,10 +1391,57 @@ while($listener.IsListening){
             continue
         }
 
+        if($path -eq "/api/live-poll"){
+            try{
+                # Read the EQ log immediately when the browser asks for live data.
+                # This keeps recognition independent from unrelated API requests.
+                Read-NewLoot
+                $since=0
+                [void][int]::TryParse($req.QueryString["since"],[ref]$since)
+                $selected=@($events|Where-Object{$_.id -gt $since})
+                $appVersion=Get-AppVersionInfo
+                $payload=[pscustomobject]@{
+                    ok=$true
+                    version=[string]$appVersion.version
+                    channel=[string]$appVersion.channel
+                    logPath=$logPath
+                    logFile=$logFileName
+                    character=$character
+                    lastEventId=$nextId-1
+                    position=$position
+                    sessionStartPosition=$script:sessionStartPosition
+                    sessionResetAt=$script:sessionResetAt
+                    sessionId=[string]$script:sessionId
+                    currentZone=$script:currentZone
+                    currentZoneId=$script:currentZoneId
+                    currentInstanceId=$script:currentInstanceId
+                    currentZoneVersion=$script:currentZoneVersion
+                    currentZoneEnteredAt=$script:currentZoneEnteredAt
+                    observedLootHistoryEnabled=($config.observedLootHistoryEnabled -ne $false)
+                    staleSessionRejects=[int]$script:staleSessionRejects
+                    events=$selected
+                    serverTime=(Get-Date).ToString("o")
+                }|ConvertTo-Json -Depth 8
+                $bytes=[Text.Encoding]::UTF8.GetBytes($payload)
+                $res.ContentType="application/json; charset=utf-8"
+                $res.StatusCode=200
+                $res.ContentLength64=$bytes.Length
+                $res.OutputStream.Write($bytes,0,$bytes.Length)
+            }catch{
+                $payload=[pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json
+                $bytes=[Text.Encoding]::UTF8.GetBytes($payload)
+                $res.StatusCode=500
+                $res.ContentType="application/json; charset=utf-8"
+                $res.ContentLength64=$bytes.Length
+                $res.OutputStream.Write($bytes,0,$bytes.Length)
+            }
+            continue
+        }
+
         if($path -eq "/api/status"){
             $sync=$null;if(Test-Path $syncDataPath){try{$sync=Get-Content $syncDataPath -Raw|ConvertFrom-Json}catch{}}
             $appVersion=Get-AppVersionInfo
-            $payload=[pscustomobject]@{app="EverQuest Research & Loot Tool";version=[string]$appVersion.version;channel=[string]$appVersion.channel;root=$root;active=$true;logPath=$logPath;logFile=$logFileName;character=$character;lastEventId=$nextId-1;position=$position;sessionStartPosition=$script:sessionStartPosition;sessionResetAt=$script:sessionResetAt;sessionId=[string]$script:sessionId;staleSessionRejects=[int]$script:staleSessionRejects;sync=$(if($sync){[pscustomobject]@{syncedAt=$sync.syncedAt;recipeCount=@($sync.recipes).Count;errors=@($sync.errors).Count}}else{$null})}|ConvertTo-Json -Depth 8
+            $payload=[pscustomobject]@{app="EverQuest Research & Loot Tool";version=[string]$appVersion.version;channel=[string]$appVersion.channel;root=$root;active=$true;logPath=$logPath;logFile=$logFileName;character=$character;lastEventId=$nextId-1;position=$position;sessionStartPosition=$script:sessionStartPosition;sessionResetAt=$script:sessionResetAt;sessionId=[string]$script:sessionId;currentZone=$script:currentZone;currentZoneId=$script:currentZoneId;currentInstanceId=$script:currentInstanceId;currentZoneVersion=$script:currentZoneVersion;currentZoneEnteredAt=$script:currentZoneEnteredAt;observedLootHistoryEnabled=($config.observedLootHistoryEnabled -ne $false);staleSessionRejects=[int]$script:staleSessionRejects;sync=$(if($sync){[pscustomobject]@{syncedAt=$sync.syncedAt;recipeCount=@($sync.recipes).Count;errors=@($sync.errors).Count}}else{$null})}|ConvertTo-Json -Depth 8
             $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.StatusCode=200;$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
         }
         if($path -eq "/api/events"){
@@ -1267,4 +1704,18 @@ while($listener.IsListening){
         try{$msg=[Text.Encoding]::UTF8.GetBytes($_.Exception.Message);$res.StatusCode=500;$res.ContentType="text/plain; charset=utf-8";$res.ContentLength64=$msg.Length;$res.OutputStream.Write($msg,0,$msg.Length)}catch{}
     }finally{try{$res.OutputStream.Close()}catch{}}
 }
-}finally{try{$listener.Stop()}catch{};try{$listener.Close()}catch{}}
+ }finally{
+    try{
+        if($script:historyIndexWorkerProcess -and -not $script:historyIndexWorkerProcess.HasExited){
+            Stop-Process -Id $script:historyIndexWorkerProcess.Id -Force -ErrorAction SilentlyContinue
+        }
+        if($script:persistenceWorkerProcess -and -not $script:persistenceWorkerProcess.HasExited){
+            Stop-Process -Id $script:persistenceWorkerProcess.Id -Force -ErrorAction SilentlyContinue
+        }
+        if($script:liveEventWorkerProcess -and -not $script:liveEventWorkerProcess.HasExited){
+            Stop-Process -Id $script:liveEventWorkerProcess.Id -Force -ErrorAction SilentlyContinue
+        }
+    }catch{}
+    try{$listener.Stop()}catch{}
+    try{$listener.Close()}catch{}
+}

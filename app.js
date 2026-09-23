@@ -4,12 +4,16 @@ const BUILTIN_BASTION_RECIPES=[...(BASTION_DATA.recipes||[])];
 const syncedSpellMetadata=new Map();
 
 const LIVE_COMPANION_ORIGIN="http://127.0.0.1:8765";
+const LIVE_EVENT_ORIGIN="http://127.0.0.1:8767";
+function liveEventUrl(path){return `${LIVE_EVENT_ORIGIN}${path}`;}
+const PERSISTENCE_ORIGIN="http://127.0.0.1:8766";
+function persistenceUrl(path){return `${PERSISTENCE_ORIGIN}${path}`;}
 function apiUrl(path){
  const onCompanion=location.protocol.startsWith("http")&&location.hostname==="127.0.0.1"&&location.port==="8765";
  return onCompanion?path:`${LIVE_COMPANION_ORIGIN}${path}`;
 }
 
-let ACTIVE_DATA=BASTION_DATA,inventory=[],aggregated=[],inventorySources=[],mageloInventory=[],mageloPlacements=[],mageloMeta=null,recipeResults=[],selectedKey=null,liveLootCounts=new Map(),liveOwnedCounts=new Map(),sessionLootEvents=[],previousMageloCounts=null,liveLootFeed=[],liveLastEventId=0,liveEnabled=true,liveAudioCtx=null,liveMonitorOnline=false,corpusSyncInProgress=false,livePollInFlight=false,liveSessionEpoch=0,sessionResetInProgress=false,liveSessionId=null,processedLiveEventIds=new Set(),sessionRecoveryPending=true,sessionRecoveryChecked=false,autoUpdateCheckStarted=false;
+let ACTIVE_DATA=BASTION_DATA,inventory=[],aggregated=[],inventorySources=[],mageloInventory=[],mageloPlacements=[],mageloMeta=null,recipeResults=[],selectedKey=null,liveLootCounts=new Map(),liveOwnedCounts=new Map(),sessionLootEvents=[],previousMageloCounts=null,liveLootFeed=[],liveLastEventId=0,liveEnabled=true,liveAudioCtx=null,liveMonitorOnline=false,corpusSyncInProgress=false,livePollInFlight=false,liveSessionEpoch=0,sessionResetInProgress=false,liveSessionId=null,processedLiveEventIds=new Set(),pendingLiveEventIds=new Set(),pendingLiveEvents=[],pendingLiveProcessTimer=null,liveClassificationCache=new Map(),observedLootHistory=[],lootHistoryLoaded=false,historySummaryLoaded=false,historySummaryInFlight=false,historySummaryLastFetch=0,observedHistoryEnabled=true,historyQueryTimer=null,currentZoneContext={zone:"",zoneId:null,instanceId:null,zoneVersion:null,enteredAt:null},sessionRecoveryPending=true,sessionRecoveryChecked=false,autoUpdateCheckStarted=false;
 const $=s=>document.querySelector(s),norm=s=>(s||"").toLowerCase().replace(/[’']/g,"`").replace(/\s+/g," ").trim();
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 function canonical(s){let n=norm(s);if(n.startsWith("spell: "))n=n.slice(7);return(ACTIVE_DATA.aliases||{})[n]||n}
@@ -436,12 +440,22 @@ function useMatchesSelectedClass(u){
  return classMatches(u,cls);
 }
 function classifyLoot(name){
+ const settings=liveSettings(),selectedClass=$("#classFilter")?.value||"ALL";
+ const cacheKey=`${canonical(name)}|${settings.classOnly?selectedClass:"ALL"}|${settings.threshold}`;
+ const cached=liveClassificationCache.get(cacheKey);
+ if(cached)return cached;
  const lookup=researchUsesForLootName(name),uses=lookup.uses.filter(useMatchesSelectedClass);
  const spellUses=uses.filter(u=>!u._isSubcombine),subUses=uses.filter(u=>u._isSubcombine);
- const threshold=liveSettings().threshold;
+ const threshold=settings.threshold;
  const ambiguous=lookup.items.filter(x=>x.id).length>1;
  const value=uses.length>=threshold?"HIGH VALUE":uses.length?"KEEP":"UNKNOWN";
- return {name,uses,spellUses,subUses,value,ambiguous,ids:lookup.items.filter(x=>x.id).map(x=>x.id)};
+ const result={name,uses,spellUses,subUses,value,ambiguous,ids:lookup.items.filter(x=>x.id).map(x=>x.id)};
+ liveClassificationCache.set(cacheKey,result);
+ if(liveClassificationCache.size>2000){
+  const first=liveClassificationCache.keys().next().value;
+  if(first)liveClassificationCache.delete(first);
+ }
+ return result;
 }
 function openLootUseModal(entry){
  if(!entry)return;
@@ -455,14 +469,14 @@ function openLootUseModal(entry){
 function closeLootUseModal(){$("#lootUseModal")?.classList.add("hidden");document.body.style.overflow="";}
 function renderLiveFeed(){
  const el=$("#liveLootFeed");if(!el)return;if(!liveLootFeed.length){el.innerHTML='<p class="muted">No live loot yet.</p>';return}
- el.innerHTML=liveLootFeed.slice(0,60).map((x,i)=>{const css=x.value==="HIGH VALUE"?"high":x.value==="KEEP"?"keep":x.value==="OTHER"?"other":"unknown";return `<div class="live-loot-row ${css} clickable" tabindex="0" data-loot-index="${i}" title="${x.uses?"Click to see Research uses":"Click for item details"}"><div class="live-loot-head"><strong>${esc(x.item)}</strong><span class="live-value ${css}">${x.value}</span></div><div class="live-loot-looter">Looted by: ${esc(x.looter||"Unknown")}</div><div class="live-loot-meta">${esc(x.timestamp)}${x.uses?` • ${x.uses} verified use(s)`:""}</div>${x.ambiguous?`<div class="live-ambiguous">Multiple exact item IDs share this name; click to see all possibilities.</div>`:""}</div>`}).join("");
+ el.innerHTML=liveLootFeed.slice(0,60).map((x,i)=>{const css=x.value==="HIGH VALUE"?"high":x.value==="KEEP"?"keep":x.value==="OTHER"?"other":x.value==="CHECKING"?"checking":"unknown";return `<div class="live-loot-row ${css} clickable" tabindex="0" data-loot-index="${i}" title="${x.uses?"Click to see Research uses":"Click for item details"}"><div class="live-loot-head"><strong>${esc(x.item)}</strong><span class="live-value ${css}">${x.value}</span></div><div class="live-loot-looter">Looted by: ${esc(x.looter||"Unknown")}</div><div class="live-loot-meta">${esc(x.timestamp)}${x.zone?` • ${esc(x.zone)}`:""}${x.uses?` • ${x.uses} verified use(s)`:""}</div>${x.ambiguous?`<div class="live-ambiguous">Multiple exact item IDs share this name; click to see all possibilities.</div>`:""}</div>`}).join("");
  document.querySelectorAll(".live-loot-row.clickable").forEach(row=>{const open=()=>openLootUseModal(liveLootFeed[Number(row.dataset.lootIndex)]);row.onclick=open;row.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open()}}});
 }
 function csvCell(v){const s=String(v??"");return /[",\r\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s}
 function exportSessionLoot(){
- const headers=["Timestamp","Looter","Self","Item","Research Classification","Verified Uses","Ambiguous ID","Candidate Item IDs","Counted As Owned","Ownership Mode"];
+ const headers=["Timestamp","Zone","Zone ID","Instance ID","Zone Version","Looter","Self","Item","Research Classification","Verified Uses","Ambiguous ID","Candidate Item IDs","Counted As Owned","Ownership Mode"];
  const rows=sessionLootEvents.map(x=>[
-  x.timestamp,x.looter,x.self?"Yes":"No",x.item,x.researchValue||"Non-Research/Unmapped",
+  x.timestamp,x.zone||"",x.zoneId??"",x.instanceId??"",x.zoneVersion??"",x.looter,x.self?"Yes":"No",x.item,x.researchValue||"Non-Research/Unmapped",
   x.verifiedUses||0,x.ambiguous?"Yes":"No",x.candidateIds||"",x.countedAsOwned?"Yes":"No",
   x.ownershipMode==="COUNT"?"Count as owned":"Track only"
  ]);
@@ -491,7 +505,7 @@ let pendingSessionPersist=[],sessionPersistTimer=null,sessionPersistPromise=null
 function queueSessionEvent(entry){
  if(!entry||!liveMonitorOnline||sessionResetInProgress||!liveSessionId)return;
  pendingSessionPersist.push(entry);
- if(!sessionPersistTimer)sessionPersistTimer=setTimeout(()=>{sessionPersistTimer=null;flushSessionPersistQueue()},150);
+ if(!sessionPersistTimer)sessionPersistTimer=setTimeout(()=>{sessionPersistTimer=null;flushSessionPersistQueue()},500);
 }
 async function flushSessionPersistQueue(){
  if(sessionPersistPromise||!pendingSessionPersist.length||!liveMonitorOnline||!liveSessionId)return sessionPersistPromise;
@@ -499,7 +513,7 @@ async function flushSessionPersistQueue(){
  const batchSessionId=liveSessionId;
  sessionPersistPromise=(async()=>{
   try{
-   const r=await fetch(apiUrl("/api/session-events"),{
+   const r=await fetch(persistenceUrl("/api/session-events"),{
     method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({sessionId:batchSessionId,events:batch}),cache:"no-store"
    });
@@ -536,7 +550,7 @@ function applySessionEvents(events){
   liveLootCounts.set(key,(liveLootCounts.get(key)||0)+1);
   if(e.countedAsOwned)liveOwnedCounts.set(key,(liveOwnedCounts.get(key)||0)+1);
   const value=e.researchValue||"OTHER";
-  liveLootFeed.unshift({item:e.item,looter:e.looter||"Unknown",timestamp:e.timestamp||"",value,uses:Number(e.verifiedUses||0),ambiguous:!!e.ambiguous,ids:String(e.candidateIds||"").split("|").filter(Boolean).map(Number)});
+  liveLootFeed.unshift({item:e.item,looter:e.looter||"Unknown",timestamp:e.timestamp||"",zone:e.zone||"",value,uses:Number(e.verifiedUses||0),ambiguous:!!e.ambiguous,ids:String(e.candidateIds||"").split("|").filter(Boolean).map(Number)});
  }
  liveLootFeed=liveLootFeed.slice(0,120);
  evaluate();renderLiveFeed();renderLiveSession();renderSummary();renderList();renderDetail();renderReverseLookup();
@@ -655,11 +669,18 @@ async function checkRecoverableSession(){
   }else sessionRecoveryPending=false;
  }catch{sessionRecoveryPending=false}
 }
-function processLootEvent(evt,{isReplay=false,deferRender=false}={}){
+function replaceProvisionalFeedRow(eventId,entry){
+ const idx=liveLootFeed.findIndex(x=>x?.eventId!=null&&Number(x.eventId)===Number(eventId));
+ if(idx>=0)liveLootFeed[idx]=entry;
+ else liveLootFeed.unshift(entry);
+ if(liveLootFeed.length>120)liveLootFeed.length=120;
+}
+function processLootEvent(evt,{isReplay=false,deferRender=false,provisionalAccepted=false,skipRecipeEvaluation=false}={}){
  if(sessionResetInProgress&&!isReplay)return {processed:false,recipeChanged:false};
  if(!isReplay&&evt?.id!=null){
   const eventId=Number(evt.id);
-  if(processedLiveEventIds.has(eventId))return {processed:false,recipeChanged:false};
+  if(!provisionalAccepted&&processedLiveEventIds.has(eventId))return {processed:false,recipeChanged:false};
+  if(provisionalAccepted)pendingLiveEventIds.delete(eventId);
   processedLiveEventIds.add(eventId);
   if(processedLiveEventIds.size>5000){
    const keep=[...processedLiveEventIds].sort((a,b)=>b-a).slice(0,2500);
@@ -672,41 +693,47 @@ function processLootEvent(evt,{isReplay=false,deferRender=false}={}){
  const countedAsOwned=(s.ownershipMode==="COUNT")&&tracked;
  if(!isReplay){
   const sessionEntry={
-   id:evt.id??null,sessionId:liveSessionId,timestamp:evt.timestamp||"",looter:evt.looter||"Unknown",self:!!evt.self,
+   id:evt.id??null,sessionId:liveSessionId,timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",zoneId:evt.zoneId??currentZoneContext.zoneId??null,instanceId:evt.instanceId??currentZoneContext.instanceId??null,zoneVersion:evt.zoneVersion??currentZoneContext.zoneVersion??null,looter:evt.looter||"Unknown",self:!!evt.self,
    item:evt.item||"",researchValue:cls.uses.length?cls.value:(/^words? of |^rune of |grimoire|compendium|memoir|writ|tome|signet|emblem|bolts|card of /i.test(evt.item)?"UNKNOWN":""),
    verifiedUses:cls.uses.length,ambiguous:!!cls.ambiguous,candidateIds:(cls.ids||[]).join("|"),
    tracked,countedAsOwned,ownershipMode:s.ownershipMode,recordedAt:new Date().toISOString()
   };
   sessionLootEvents.push(sessionEntry);queueSessionEvent(sessionEntry);
+  if(observedHistoryEnabled){
+   observedLootHistory.unshift(sessionEntry);
+   if(observedLootHistory.length>5000)observedLootHistory.length=5000;
+  }
  }
  if(!tracked)return {processed:true,recipeChanged:false};
 
- // Ordinary/unmapped loot cannot affect recipe readiness. Avoid the expensive
- // recipe recalculation for those events.
  const affectsRecipes=cls.uses.length>0;
- const before=affectsRecipes?readySpellKeys():null;
+ let before=null,newly=[];
+ if(affectsRecipes&&!skipRecipeEvaluation)before=readySpellKeys();
 
  const key=canonical(evt.item);
  liveLootCounts.set(key,(liveLootCounts.get(key)||0)+1);
  if(!isReplay&&countedAsOwned)liveOwnedCounts.set(key,(liveOwnedCounts.get(key)||0)+1);
 
- let newly=[];
- if(affectsRecipes){
+ if(affectsRecipes&&!skipRecipeEvaluation){
   evaluate();
   const after=readySpellKeys();
   newly=recipeResults.filter(r=>after.has(r._key)&&!before.has(r._key));
  }
 
+ let feedEntry=null;
  if(cls.uses.length){
-  liveLootFeed.unshift({item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",value:cls.value,uses:cls.uses.length,ambiguous:cls.ambiguous,ids:cls.ids});
+  feedEntry={eventId:evt.id??null,item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",value:cls.value,uses:cls.uses.length,ambiguous:cls.ambiguous,ids:cls.ids};
   if(liveEnabled){if(cls.value==="HIGH VALUE"&&s.soundHigh)beep("high");else if(s.soundAny)beep("research");}
- }else if(isReplay){
-  // Replay intentionally includes only relevant items in the visible feed.
- }else{
+ }else if(!isReplay){
   const researchLooking=/^words? of |^rune of |grimoire|compendium|memoir|writ|tome|signet|emblem|bolts|card of /i.test(evt.item);
-  liveLootFeed.unshift({item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",value:researchLooking?"UNKNOWN":"OTHER",uses:0,ambiguous:false,ids:[]});
+  feedEntry={eventId:evt.id??null,item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",value:researchLooking?"UNKNOWN":"OTHER",uses:0,ambiguous:false,ids:[]};
  }
- if(liveLootFeed.length>120)liveLootFeed.length=120;
+
+ if(feedEntry){
+  if(provisionalAccepted&&evt?.id!=null)replaceProvisionalFeedRow(evt.id,feedEntry);
+  else liveLootFeed.unshift(feedEntry);
+  if(liveLootFeed.length>120)liveLootFeed.length=120;
+ }
 
  if(newly.length)addCraftableAlerts(newly,evt);
 
@@ -715,6 +742,267 @@ function processLootEvent(evt,{isReplay=false,deferRender=false}={}){
   if(affectsRecipes){renderSummary();renderList();renderDetail();renderReverseLookup();}
  }
  return {processed:true,recipeChanged:affectsRecipes};
+}
+function acceptLiveEventImmediately(evt){
+ if(!evt)return false;
+ const id=evt.id!=null?Number(evt.id):null;
+ if(id!=null&&(processedLiveEventIds.has(id)||pendingLiveEventIds.has(id)))return false;
+ if(id!=null)pendingLiveEventIds.add(id);
+ const s=liveSettings(),tracked=s.includeOthers||!!evt.self;
+ if(tracked){
+  liveLootFeed.unshift({
+   eventId:id,item:evt.item||"Unknown item",looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",
+   zone:evt.zone||currentZoneContext.zone||"",value:"CHECKING",uses:0,ambiguous:false,ids:[]
+  });
+  if(liveLootFeed.length>120)liveLootFeed.length=120;
+ }
+ pendingLiveEvents.push(evt);
+ return true;
+}
+function schedulePendingLiveProcessing(){
+ if(pendingLiveProcessTimer||!pendingLiveEvents.length)return;
+ pendingLiveProcessTimer=setTimeout(processPendingLiveEvents,0);
+}
+function processPendingLiveEvents(){
+ pendingLiveProcessTimer=null;
+ if(sessionResetInProgress){pendingLiveEvents=[];pendingLiveEventIds.clear();return}
+ const batch=pendingLiveEvents.splice(0,50);
+ if(!batch.length)return;
+
+ const beforeReady=readySpellKeys();
+ let recipeChanged=false,lastRecipeEvt=null;
+ for(const evt of batch){
+  const result=processLootEvent(evt,{deferRender:true,provisionalAccepted:true,skipRecipeEvaluation:true});
+  if(result?.recipeChanged){recipeChanged=true;lastRecipeEvt=evt}
+ }
+
+ if(recipeChanged){
+  evaluate();
+  const afterReady=readySpellKeys();
+  const newly=recipeResults.filter(r=>afterReady.has(r._key)&&!beforeReady.has(r._key));
+  if(newly.length&&lastRecipeEvt)addCraftableAlerts(newly,lastRecipeEvt);
+ }
+
+ renderLiveFeed();
+ renderLiveSession();
+
+ if(recipeChanged){
+  setTimeout(()=>{
+   renderSummary();
+   renderList();
+   renderDetail();
+   renderReverseLookup();
+  },20);
+ }
+ if(historyWorkspaceActive()){populateHistoryFilters();renderLootHistory();}
+ if(pendingSessionPersist.length)flushSessionPersistQueue();
+ if(pendingLiveEvents.length)schedulePendingLiveProcessing();
+}
+
+function historyResearchRelated(x){
+ const v=String(x?.researchValue||"").toUpperCase();
+ return Number(x?.verifiedUses||0)>0||v==="HIGH VALUE"||v==="KEEP"||v==="UNKNOWN";
+}
+function setCurrentZoneContext(sj){
+ currentZoneContext={
+  zone:String(sj?.currentZone||""),
+  zoneId:sj?.currentZoneId??null,
+  instanceId:sj?.currentInstanceId??null,
+  zoneVersion:sj?.currentZoneVersion??null,
+  enteredAt:sj?.currentZoneEnteredAt||null
+ };
+ const name=currentZoneContext.zone||"Unknown zone";
+ if($("#currentZoneName"))$("#currentZoneName").textContent=name;
+ if($("#historyCurrentZone"))$("#historyCurrentZone").textContent=name;
+ const bits=[];
+ if(currentZoneContext.zoneId!=null)bits.push(`Zone ID ${currentZoneContext.zoneId}`);
+ if(currentZoneContext.instanceId!=null)bits.push(`Instance ${currentZoneContext.instanceId}`);
+ if(currentZoneContext.zoneVersion!=null)bits.push(`Version ${currentZoneContext.zoneVersion}`);
+ if(currentZoneContext.enteredAt)bits.push(`Entered ${currentZoneContext.enteredAt}`);
+ if($("#historyInstanceText"))$("#historyInstanceText").textContent=bits.length?bits.join(" • "):"Open-world / instance details not present in the current log context.";
+}
+function populateHistoryFilters(){
+ const zoneSel=$("#historyZoneFilter"),looterSel=$("#historyLooterFilter");
+ if(zoneSel){
+  const keep=zoneSel.value||"ALL";
+  const zones=[...new Set(observedLootHistory.map(x=>String(x.zone||"Unknown")).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  zoneSel.innerHTML='<option value="ALL">All zones</option>'+zones.map(z=>`<option value="${esc(z)}">${esc(z)}</option>`).join("");
+  zoneSel.value=zones.includes(keep)?keep:"ALL";
+ }
+ if(looterSel){
+  const keep=looterSel.value||"ALL";
+  const looters=[...new Set(observedLootHistory.map(x=>String(x.looter||"Unknown")).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  looterSel.innerHTML='<option value="ALL">All looters</option>'+looters.map(z=>`<option value="${esc(z)}">${esc(z)}</option>`).join("");
+  looterSel.value=looters.includes(keep)?keep:"ALL";
+ }
+}
+function filteredLootHistory(){return observedLootHistory;}
+function renderHistorySummaryList(elId,map,limit=10){
+ const el=$(elId);if(!el)return;
+ const rows=[...map.entries()].sort((a,b)=>b[1]-a[1]||String(a[0]).localeCompare(String(b[0]))).slice(0,limit);
+ el.innerHTML=rows.length?rows.map(([name,count])=>`<div class="history-summary-row"><span>${esc(name||"Unknown")}</span><strong>${count}</strong></div>`).join(""):'<p class="muted">No matching observations.</p>';
+}
+function renderLootHistory(){
+ const rows=filteredLootHistory();
+ const uniqueItems=new Set(rows.map(x=>canonical(x.item||"")).filter(Boolean));
+ const zones=new Set(rows.map(x=>String(x.zone||"Unknown")).filter(Boolean));
+ const research=rows.filter(historyResearchRelated).length;
+ if($("#historyEventCount"))$("#historyEventCount").textContent=rows.length.toLocaleString();
+ if($("#historyItemCount"))$("#historyItemCount").textContent=uniqueItems.size.toLocaleString();
+ if($("#historyZoneCount"))$("#historyZoneCount").textContent=zones.size.toLocaleString();
+ if($("#historyResearchCount"))$("#historyResearchCount").textContent=research.toLocaleString();
+
+ const zoneCounts=new Map(),itemCounts=new Map();
+ for(const x of rows){
+  const z=String(x.zone||"Unknown"),item=String(x.item||"Unknown");
+  zoneCounts.set(z,(zoneCounts.get(z)||0)+1);
+  itemCounts.set(item,(itemCounts.get(item)||0)+1);
+ }
+ renderHistorySummaryList("#historyZoneSummary",zoneCounts);
+ renderHistorySummaryList("#historyItemSummary",itemCounts);
+
+ const el=$("#historyResults");
+ if($("#historyResultStatus"))$("#historyResultStatus").textContent=`${rows.length.toLocaleString()} matching observation${rows.length===1?"":"s"}${observedLootHistory.length>=5000?" • showing latest 5,000 stored records":""}`;
+ if(!el)return;
+ if(!rows.length){el.innerHTML='<p class="muted">No matching observed loot history.</p>';return}
+ el.innerHTML=rows.slice(0,300).map(x=>{
+  const rv=String(x.researchValue||"OTHER")||"OTHER";
+  const css=rv==="HIGH VALUE"?"high":rv==="KEEP"?"keep":rv==="UNKNOWN"?"unknown":"other";
+  const inst=x.instanceId!=null?` • Instance ${esc(x.instanceId)}`:"";
+  return `<div class="history-row"><div class="history-row-head"><strong>${esc(x.item||"Unknown item")}</strong><span class="live-value ${css}">${esc(rv)}</span></div><div class="history-row-zone">${esc(x.zone||"Unknown zone")}${inst}</div><div class="history-row-meta">${esc(x.timestamp||x.recordedAt||"")} • Looted by ${esc(x.looter||"Unknown")}${x.verifiedUses?` • ${Number(x.verifiedUses)} verified Research use(s)`:""}</div></div>`;
+ }).join("");
+}
+function historyWorkspaceActive(){return !$("#historyWorkspace")?.classList.contains("hidden")}
+function applyHistorySummary(j){
+ if(!j)return;
+ historySummaryLoaded=true;historySummaryLastFetch=Date.now();
+ if($("#historyStorageStatus")){
+  const mb=(Number(j.totalBytes||0)/1048576).toFixed(1);
+  $("#historyStorageStatus").textContent=`${Number(j.totalEvents||0).toLocaleString()} total observations • ${mb} MB • ${Number(j.archiveCount||0)} monthly archive file${Number(j.archiveCount||0)===1?"":"s"}${j.oldest?` • oldest ${j.oldest}`:""}`;
+ }
+ if($("#homeHistoryEvents"))$("#homeHistoryEvents").textContent=Number(j.totalEvents||0).toLocaleString();
+ if($("#homeHistoryZones"))$("#homeHistoryZones").textContent=Number(j.totalZones||0).toLocaleString();
+ if($("#homeHistoryItems"))$("#homeHistoryItems").textContent=Number(j.totalItems||0).toLocaleString();
+ if($("#navHistoryCount"))$("#navHistoryCount").textContent=Number(j.totalEvents||0).toLocaleString();
+}
+async function loadObservedLootHistorySummary(){
+ if(historySummaryInFlight||!liveMonitorOnline||!observedHistoryEnabled)return;
+ historySummaryInFlight=true;
+ try{
+  const r=await fetch(apiUrl("/api/loot-history-summary"),{cache:"no-store"}),j=await r.json();
+  if(r.ok&&j?.ok)applyHistorySummary(j);
+ }catch{}finally{historySummaryInFlight=false}
+}
+async function loadObservedLootHistory(){
+ try{
+  if(!liveMonitorOnline||!observedHistoryEnabled)return;
+  const item=$("#historyItemFilter")?.value||"";
+  const zone=$("#historyZoneFilter")?.value||"ALL";
+  const looter=$("#historyLooterFilter")?.value||"ALL";
+  const value=$("#historyValueFilter")?.value||"ALL";
+  const q=new URLSearchParams({limit:"5000",item,zone,looter,value});
+  const r=await fetch(apiUrl(`/api/loot-history?${q.toString()}`),{cache:"no-store"}),j=await r.json();
+  if(!r.ok||!j?.ok)throw Error(j?.error||`history HTTP ${r.status}`);
+  observedLootHistory=Array.isArray(j.events)?j.events:[];
+  lootHistoryLoaded=true;
+  applyHistorySummary(j);
+  populateHistoryFilters();
+  renderLootHistory();
+ }catch(e){
+  if($("#historyResultStatus"))$("#historyResultStatus").textContent=`History load failed: ${e.message}`;
+ }
+}
+function exportObservedLootHistory(){
+ const rows=filteredLootHistory();
+ const headers=["Timestamp","Zone","Zone ID","Instance ID","Zone Version","Looter","Item","Research Classification","Verified Uses","Session ID","Recorded At"];
+ const data=rows.map(x=>[x.timestamp||"",x.zone||"",x.zoneId??"",x.instanceId??"",x.zoneVersion??"",x.looter||"",x.item||"",x.researchValue||"OTHER",x.verifiedUses||0,x.sessionId||"",x.historyRecordedAt||x.recordedAt||""]);
+ const csv=[headers,...data].map(r=>r.map(csvCell).join(",")).join("\r\n");
+ const blob=new Blob([csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");
+ const stamp=new Date().toISOString().replace(/[:.]/g,"-");
+ a.href=url;a.download=`eq-observed-loot-history-${stamp}.csv`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+}
+function switchWorkspace(name,{scroll=true}={}){
+ const showHistory=name==="history"&&observedHistoryEnabled;
+ const home=$("#homeWorkspace"),history=$("#historyWorkspace"),homeNav=$("#navHome"),historyNav=$("#navHistory");
+ if(home)home.classList.toggle("hidden",showHistory);
+ if(history)history.classList.toggle("hidden",!showHistory);
+ if(homeNav){homeNav.classList.toggle("active",!showHistory);homeNav.setAttribute("aria-current",showHistory?"false":"page")}
+ if(historyNav){historyNav.classList.toggle("active",showHistory);historyNav.setAttribute("aria-current",showHistory?"page":"false")}
+ if(showHistory){
+  loadObservedLootHistory();
+ }
+ if(scroll)window.scrollTo({top:0,behavior:"smooth"});
+ try{sessionStorage.setItem("eqResearchWorkspace",showHistory?"history":"home")}catch{}
+}
+function applyObservedHistoryVisibility(){
+ const panel=$("#observedLootHistoryPanel"),historyWorkspace=$("#historyWorkspace");
+ const toggle=$("#observedHistoryEnabled"),nav=$("#navHistory"),homeCard=$("#homeHistoryCard");
+ if(panel)panel.classList.toggle("hidden",!observedHistoryEnabled);
+ if(nav)nav.classList.toggle("hidden",!observedHistoryEnabled);
+ if(homeCard)homeCard.classList.toggle("hidden",!observedHistoryEnabled);
+ if(historyWorkspace&&!observedHistoryEnabled&&!historyWorkspace.classList.contains("hidden"))switchWorkspace("home",{scroll:false});
+ if(toggle)toggle.checked=observedHistoryEnabled;
+ const status=$("#observedHistorySettingsStatus");
+ if(status)status.textContent=observedHistoryEnabled
+  ?"History recording is ON. Monthly archives and the compact search index are retained locally."
+  :"History recording is OFF. Existing archive files are preserved; zone tracking and current-session zone data remain active.";
+}
+async function loadObservedHistorySetting(){
+ try{
+  if(!liveMonitorOnline)return;
+  const r=await fetch(apiUrl("/api/loot-history-setting"),{cache:"no-store"}),j=await r.json();
+  if(r.ok&&j?.ok){
+   observedHistoryEnabled=j.enabled!==false;
+   applyObservedHistoryVisibility();
+   if(observedHistoryEnabled)loadObservedLootHistorySummary();
+  }
+ }catch{}
+}
+async function saveObservedHistorySetting(enabled){
+ const r=await fetch(apiUrl("/api/loot-history-setting"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:!!enabled}),cache:"no-store"});
+ const j=await r.json();
+ if(!r.ok||!j?.ok)throw Error(j?.error||`history setting HTTP ${r.status}`);
+ observedHistoryEnabled=j.enabled!==false;
+ lootHistoryLoaded=false;historySummaryLoaded=false;
+ applyObservedHistoryVisibility();
+ if(observedHistoryEnabled){await loadObservedLootHistorySummary();if(historyWorkspaceActive())await loadObservedLootHistory();}
+}
+function scheduleHistoryQuery(){
+ if(!observedHistoryEnabled)return;
+ clearTimeout(historyQueryTimer);
+ historyQueryTimer=setTimeout(()=>loadObservedLootHistory(),250);
+}
+async function rebuildObservedHistoryIndex(){
+ const btn=$("#rebuildHistoryIndex"),status=$("#observedHistorySettingsStatus");
+ if(btn){btn.disabled=true;btn.textContent="Rebuilding…"}
+ try{
+  const r=await fetch(apiUrl("/api/loot-history-rebuild-index"),{cache:"no-store"}),j=await r.json();
+  if(!r.ok||!j?.ok)throw Error(j?.error||`rebuild HTTP ${r.status}`);
+  if(status)status.textContent=`History index rebuilt • ${Number(j.index?.totalEvents||0).toLocaleString()} observations indexed.`;
+  lootHistoryLoaded=false;historySummaryLoaded=false;
+  if(observedHistoryEnabled){await loadObservedLootHistorySummary();if(historyWorkspaceActive())await loadObservedLootHistory();}
+ }catch(e){
+  if(status)status.textContent=`Index rebuild failed: ${e.message}`;
+ }finally{
+  if(btn){btn.disabled=false;btn.textContent="Rebuild History Index"}
+ }
+}
+function setupLootHistoryUI(){
+ $("#refreshLootHistory")?.addEventListener("click",loadObservedLootHistory);
+ $("#exportLootHistory")?.addEventListener("click",exportObservedLootHistory);
+ $("#historyItemFilter")?.addEventListener("input",scheduleHistoryQuery);
+ $("#historyZoneFilter")?.addEventListener("change",loadObservedLootHistory);
+ $("#historyLooterFilter")?.addEventListener("change",loadObservedLootHistory);
+ $("#historyValueFilter")?.addEventListener("change",loadObservedLootHistory);
+ $("#observedHistoryEnabled")?.addEventListener("change",e=>saveObservedHistorySetting(e.target.checked));
+ $("#rebuildHistoryIndex")?.addEventListener("click",rebuildObservedHistoryIndex);
+ $("#navHome")?.addEventListener("click",()=>switchWorkspace("home"));
+ $("#navHistory")?.addEventListener("click",()=>switchWorkspace("history"));
+ $("#openHistoryWorkspace")?.addEventListener("click",()=>switchWorkspace("history"));
+ $("#backToLiveWorkspace")?.addEventListener("click",()=>switchWorkspace("home"));
+ let saved="home";try{saved=sessionStorage.getItem("eqResearchWorkspace")||"home"}catch{}
+ if(saved==="history"&&observedHistoryEnabled)switchWorkspace("history",{scroll:false});
+ else switchWorkspace("home",{scroll:false});
 }
 
 function liveOwnershipSummaryText(mode){
@@ -726,23 +1014,58 @@ function refreshLiveHeaderStatus(){
  const mode=$("#lootOwnershipMode")?.value||"COUNT";
  const el=$("#liveOwnershipSummary");if(el)el.textContent=liveOwnershipSummaryText(mode);
 }
+function parseEqLogTimestamp(value){
+ if(!value)return null;
+ const ms=Date.parse(String(value));
+ return Number.isFinite(ms)?ms:null;
+}
+function updateLiveLatency(evt){
+ if(!evt)return;
+ const badge=$("#liveLatencyBadge"),value=$("#liveLatencyValue");
+ if(!badge||!value)return;
+ const now=Date.now();
+ const eqMs=parseEqLogTimestamp(evt.timestamp);
+ const detectedMs=evt.detectedAt?Date.parse(evt.detectedAt):NaN;
+ const totalMs=eqMs!=null?Math.max(0,now-eqMs):null;
+ const sourceMs=Number.isFinite(detectedMs)&&eqMs!=null?Math.max(0,detectedMs-eqMs):null;
+ const deliveryMs=Number.isFinite(detectedMs)?Math.max(0,now-detectedMs):null;
+ if(totalMs==null)return;
+ const seconds=totalMs/1000;
+ value.textContent=`${seconds.toFixed(seconds<10?1:0)}s`;
+ badge.classList.remove("hidden","good","warn","slow");
+ badge.classList.add(seconds<1.5?"good":seconds<3?"warn":"slow");
+ const parts=[`Total ${seconds.toFixed(2)}s`];
+ if(sourceMs!=null)parts.push(`timestamp→companion ${(sourceMs/1000).toFixed(2)}s`);
+ if(deliveryMs!=null)parts.push(`companion→browser ${(deliveryMs/1000).toFixed(2)}s`);
+ badge.title=parts.join(" • ");
+}
 async function pollLiveMonitor(){
  if(livePollInFlight||sessionResetInProgress)return;
  livePollInFlight=true;
  const pollEpoch=liveSessionEpoch;
  try{
-  const status=await fetch(apiUrl("/api/status"),{cache:"no-store"});
-  if(!status.ok)throw Error(`status HTTP ${status.status}`);
-  const sj=await status.json();
+  const requestSince=liveLastEventId;
+  const r=await fetch(liveEventUrl(`/api/live-poll?since=${requestSince}`),{cache:"no-store"});
+  if(!r.ok)throw Error(`live-poll HTTP ${r.status}`);
+  const sj=await r.json();
+  if(!sj?.ok)throw Error(sj?.error||"Live poll failed.");
+
   const installedVersionEl=$("#installedAppVersion");
   if(installedVersionEl&&sj.version)installedVersionEl.textContent=`v${sj.version}`;
   if(pendingUpdateTarget)await reconcileCompletedUpdate(sj.version);
+  setCurrentZoneContext(sj);
+
+  if(typeof sj.observedLootHistoryEnabled==="boolean"&&sj.observedLootHistoryEnabled!==observedHistoryEnabled){
+   observedHistoryEnabled=sj.observedLootHistoryEnabled;
+   lootHistoryLoaded=false;
+   applyObservedHistoryVisibility();
+  }
+  // History summary refresh is intentionally not scheduled from the Live polling
+  // path. History/database work must never compete with live event delivery.
 
   if(sj.sessionId){
    const backendSessionId=String(sj.sessionId);
    if(liveSessionId&&backendSessionId!==liveSessionId&&!sessionResetInProgress){
-    // Another window ended the session. Adopt the new authoritative session
-    // and discard this page's old client-side session immediately.
     liveSessionId=backendSessionId;
     pendingSessionPersist=[];
     sessionLootEvents=[];
@@ -750,16 +1073,20 @@ async function pollLiveMonitor(){
     liveOwnedCounts=new Map();
     liveLootFeed=[];
     processedLiveEventIds.clear();
+    pendingLiveEventIds.clear();
+    pendingLiveEvents=[];
     renderLiveFeed();
     renderLiveSession();
    }else if(!liveSessionId){
     liveSessionId=backendSessionId;
    }
   }
+
   if(Number(sj.lastEventId||0)<liveLastEventId){
    liveLastEventId=0;
    processedLiveEventIds.clear();
   }
+
   liveMonitorOnline=true;
   $("#liveStatus").textContent=corpusSyncInProgress?"SYNCING":"ONLINE";
   $("#liveStatus").className="live-status online";
@@ -767,37 +1094,30 @@ async function pollLiveMonitor(){
   if($("#liveLogName"))$("#liveLogName").textContent=logName;
   if($("#liveLogBadge"))$("#liveLogBadge").title=`Monitoring ${logName}${sj.character?` for ${sj.character}`:""}`;
   $("#liveMonitorMessage").textContent=`Watching ${logName}${sj.character?` for ${sj.character}`:""}. Loot tracking is active.`;
+
   if(!sessionRecoveryChecked)checkRecoverableSession();
   if(sessionRecoveryPending)return;
   if(!autoUpdateCheckStarted){autoUpdateCheckStarted=true;setTimeout(autoCheckForUpdates,900)}
 
-  const requestSince=liveLastEventId;
-  const r=await fetch(apiUrl(`/api/events?since=${requestSince}`),{cache:"no-store"});
-  if(!r.ok)throw Error(`events HTTP ${r.status}`);
-  const j=await r.json();
-  const events=j.events||[];
-
-  // If the session was ended while this request was in flight, the response
-  // belongs to the old session. Do not allow it to repopulate the new session.
+  const events=sj.events||[];
   if(pollEpoch!==liveSessionEpoch){
-   liveLastEventId=Math.max(liveLastEventId,Number(j.lastEventId||0));
+   liveLastEventId=Math.max(liveLastEventId,Number(sj.lastEventId||0));
    return;
   }
 
-  // Advance the cursor before doing any UI/recipe work so even if another
-  // poll is triggered later it cannot request this same event batch again.
-  liveLastEventId=Math.max(liveLastEventId,Number(j.lastEventId||0));
+  liveLastEventId=Math.max(liveLastEventId,Number(sj.lastEventId||0));
 
-  let processedAny=false,recipeChanged=false;
+  let acceptedAny=false,lastAccepted=null;
   for(const e of events){
    if(e?.id!=null&&Number(e.id)<=requestSince)continue;
-   const result=processLootEvent(e,{deferRender:true});
-   if(result?.processed)processedAny=true;
-   if(result?.recipeChanged)recipeChanged=true;
+   if(acceptLiveEventImmediately(e)){acceptedAny=true;lastAccepted=e}
   }
-  if(processedAny){renderLiveFeed();renderLiveSession();}
-  if(recipeChanged){renderSummary();renderList();renderDetail();renderReverseLookup();}
-  if(pendingSessionPersist.length)flushSessionPersistQueue();
+
+  if(acceptedAny){
+   renderLiveFeed();
+   if(lastAccepted)updateLiveLatency(lastAccepted);
+   requestAnimationFrame(()=>schedulePendingLiveProcessing());
+  }
  }catch(e){
   if(corpusSyncInProgress){
    if($("#liveStatus")){$("#liveStatus").textContent="SYNCING";$("#liveStatus").className="live-status online"}
@@ -806,7 +1126,7 @@ async function pollLiveMonitor(){
   liveMonitorOnline=false;
   if($("#liveStatus")){$("#liveStatus").textContent="OFFLINE";$("#liveStatus").className="live-status offline"}
   if($("#liveLogName"))$("#liveLogName").textContent="Not connected";
-  if($("#liveMonitorMessage"))$("#liveMonitorMessage").textContent=`Live companion not detected at ${LIVE_COMPANION_ORIGIN}: ${e.message}`;
+  if($("#liveMonitorMessage"))$("#liveMonitorMessage").textContent=`Dedicated Live Loot worker not detected at ${LIVE_EVENT_ORIGIN}: ${e.message}`;
  }finally{
   livePollInFlight=false;
  }
@@ -1091,7 +1411,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeLootUseModal()}
  $("#changeLogFile")?.addEventListener("click",changeLogFile);
  $("#syncBastionCorpus")?.addEventListener("click",syncBastionCorpus);
  $("#syncSpellMetadata")?.addEventListener("click",syncSpellMetadata);
- pollLiveMonitor();loadSyncedCorpus();loadSpellMetadata();setInterval(pollLiveMonitor,1000);
+ pollLiveMonitor();loadSyncedCorpus();loadSpellMetadata();setInterval(pollLiveMonitor,125);
 }
 
 function normalizeMageloInput(v){
@@ -1236,6 +1556,9 @@ async function reconcileCompletedUpdate(runningVersion){
   clearPendingUpdateTarget();
   latestUpdateInfo=null;
   setSettingsUpdateIndicator(false);
+  // Load the new build's HTML/JS so the static header version and every
+  // build-stamped asset update without requiring a manual browser refresh.
+  setTimeout(()=>location.reload(),900);
   return true;
  }finally{
   updateReconcileInFlight=false;
@@ -1378,6 +1701,8 @@ function setupUpdaterUI(){
 setupUpdaterUI();
 setupUpdateNoticeUI();
 setupLiveUI();
+setupLootHistoryUI();
 setTimeout(loadUpdaterState,1200);
+setTimeout(loadObservedHistorySetting,900);
 setTimeout(restoreMagelo,700);
 render();

@@ -1,5 +1,155 @@
 # Changelog
 
+## v0.17.0
+
+### Zone Tracking & Observed Loot History
+- Adds live zone tracking from Bastion/ROF2 log messages.
+- Preserves canonical zone names for instanced zones and stores Zone ID, Instance ID, and Version as separate metadata.
+- Adds a dedicated Observed History workspace with item, zone, looter, and Research filters.
+- Stores raw observations permanently in monthly archive files.
+- Adds a compact history index and archive-aware searching.
+- Adds optional Observed Loot History recording, ON by default; disabling it never deletes existing history.
+- Keeps zone tracking active even when permanent history recording is disabled.
+
+### Live Loot Reliability & Performance
+- Adds a dedicated Live Event Worker on port 8767.
+- Keeps the main application/API on port 8765.
+- Keeps session/history persistence on port 8766.
+- Keeps history indexing in a separate hidden worker process.
+- Preserves display-first Live Loot behavior and latency diagnostics.
+- Preserves session byte-watermark reset protections so ended-session loot does not reappear.
+
+### Maintenance
+- Retains in-place updater replacement and automatic browser refresh after successful updates.
+- Retains atomic Bastion corpus sync behavior and icon-loading improvements.
+
+## v0.17.0
+
+- Fixes Bastion instanced-zone identity so different instances no longer collapse into the generic `a Instanced Version of the zone` bucket.
+- Treats the Bastion PID line as authoritative instance identity when it follows a zone transition, when the current zone is a generic instance placeholder, or when the PID zone already matches the current zone.
+- Preserves the real zone name separately from instance metadata. Example: `Chardok: The Halls of Betrayal` + Zone ID 277 + Instance ID 120 + Version 255.
+- Adds a 30-second zone-transition association window so the delayed PID line can enrich the correct zone without allowing unrelated stale PID messages to replace the active zone later.
+- Applies the same parser behavior to both the dedicated Live Event Worker and the main companion fallback/replay parser.
+- Keeps dedicated Live Loot delivery on port 8767, persistence on 8766, history indexing out-of-process, and the demo.8 Research/UI behavior baseline.
+
+## v0.17.0-demo.10
+
+- Rolls back the demo.9 Research/planner refresh experiment to the demo.8 UI/behavior baseline.
+- Adds a dedicated hidden **Live Event Worker** on localhost port **8767**.
+- The Live Event Worker has one job: tail the active EverQuest log, track zone context, and serve `/api/live-poll`.
+- The browser now polls port 8767 directly for Live Loot instead of sharing the main application companion on port 8765.
+- The main companion no longer continuously tails the EQ log while waiting for application/API requests.
+- Session/history persistence remains isolated on port 8766.
+- History indexing remains in its own hidden worker process.
+- The Live Event Worker watches `session-meta.json` and resets its source boundary automatically when End Current Loot Session rotates the session.
+- Keeps the demo.8 UI, dedicated Observed History workspace, monthly archives, and updater/session reliability fixes.
+
+## v0.17.0-demo.8
+
+- Adds a separate hidden **persistence worker** on localhost port 8766.
+- Session recovery writes and permanent monthly-history writes no longer use the Live Loot listener on port 8765.
+- Live `/api/live-poll` traffic now has a dedicated listener lane instead of waiting behind disk persistence requests.
+- Removes automatic history-summary/index parsing from the recurring Live polling path.
+- Keeps persistence batching asynchronous and increases its batching window because it can no longer block Live delivery.
+- Keeps stale-session protection by validating persistence writes against the authoritative `session-meta.json`.
+- Keeps raw observed-history archives as the source of truth and retains the separate history-index worker.
+- Retains display-first Live Loot, batched Research recalculation, zone tracking, monthly archives, and updater/session reliability fixes.
+
+## v0.17.0-demo.7
+
+- Changes Live Loot to a two-stage pipeline: **display first, classify second**.
+- New loot rows are painted immediately with a brief `CHECKING` state before Research classification completes.
+- The latency badge is now updated at the immediate-display stage instead of after Research processing.
+- Batches Research recipe-readiness recalculation so a burst of multiple Research drops triggers one readiness pass instead of one pass per item.
+- Defers Research planner/reverse-lookup rerendering until after Live Loot has painted.
+- Adds a bounded Live classification cache for repeated loot names.
+- Retains the separate history-index worker, combined fast Live polling endpoint, monthly archives, zone tracking, updater polish, and prior reliability fixes.
+
+## v0.17.0-demo.6
+
+- Moves Observed Loot History index maintenance into a dedicated hidden PowerShell worker process.
+- Live Loot recognition no longer performs history-index updates or index serialization on the companion thread.
+- The worker watches monthly history archives and updates `loot-history-index.json` independently.
+- Raw monthly history files remain the source of truth; no observation data is discarded.
+- Existing history is automatically reindexed by the worker when its state file is missing.
+- History index reads now detect worker-written index changes instead of holding a stale in-memory copy forever.
+- Renames latency breakdown labels to **timestamp→companion** and **companion→browser** so blocked companion time is not misidentified as an EverQuest log-write delay.
+- Reduces automatic history-summary refresh frequency on the Live page.
+- Keeps the combined fast Live polling endpoint, 125 ms browser poll interval, zone tracking, monthly archives, updater polish, and all prior reliability fixes.
+
+## v0.17.0-demo.5
+
+- Removes periodic full history-index serialization from the Live Loot critical path.
+- Adds a combined `/api/live-poll` endpoint so status and new loot arrive in one request.
+- Forces an immediate EQ-log read whenever the browser requests live data.
+- Reduces the companion wait interval to 75 ms and browser Live polling to 125 ms.
+- Adds per-event `detectedAt` timing so the app can distinguish EQ log/source delay from app delivery delay.
+- Adds a Live **LATENCY** badge showing total observed delay; hover it to see source-vs-delivery timing.
+- Keeps raw monthly history writes and all existing archive data intact.
+- Keeps the history index rebuildable and flushes it on clean shutdown rather than blocking Live Loot every few seconds.
+- Retains dedicated Observed History workspace, monthly archives, zone tracking, updater polish, and all prior reliability fixes.
+
+## v0.17.0-demo.4
+
+- Reduces Live Loot browser polling from 1 second to 250 ms for much faster recognition.
+- Reduces the companion log-read wait interval from 250 ms to 125 ms.
+- Stops loading detailed Observed History in the background while using Live & Research.
+- Adds a lightweight history-summary endpoint for the Home card/navigation counters.
+- Only reads archive event rows when the Observed History workspace is actually opened or filtered.
+- Keeps the history index in memory and flushes it to disk about every five seconds instead of rewriting the full index on every loot batch.
+- Raw monthly loot observations are still appended immediately; deferred index writes cannot lose the authoritative observation data and the index remains rebuildable.
+- Forces a final history-index flush on clean companion shutdown.
+- Retains dedicated workspaces, monthly archives, permanent retention, zone tracking, and all v0.16.x reliability fixes.
+
+## v0.17.0-demo.3
+
+- Moves **Observed Loot History** out of the main Live/Research page into its own full-width workspace.
+- Adds top-level **Live & Research** and **Observed History** navigation.
+- Adds a compact history summary card on the main page with total observations, zones, and unique items.
+- Adds an **Open History** shortcut from the main page and a **Back to Live & Research** control from History.
+- Remembers the selected workspace for the current browser session.
+- Automatically hides the History navigation and Home summary card when permanent history recording is turned OFF.
+- Keeps zone tracking and current-session zone stamping active regardless of the selected workspace.
+- Keeps monthly archive rotation, archive-aware searching, permanent raw retention, storage statistics, and the compact history index from demo.2.
+- Carries forward updater auto-refresh/in-place backup behavior and all v0.16.x session/sync reliability fixes.
+
+## v0.17.0-demo.2
+
+- Replaces the single growing history file with automatic monthly archives under the local history folder.
+- Adds a compact `loot-history-index.json` used to identify relevant archive months before detailed history reads.
+- Makes archive searching transparent: item, zone, looter, and Research filters automatically query the relevant monthly files.
+- Keeps every raw observation indefinitely; there is no automatic purge or retention limit.
+- Adds **Record Observed Loot History** in Settings, ON by default.
+- Turning history recording OFF stops new archival writes and hides the history workspace without deleting any existing data.
+- Zone tracking and current-session zone stamping remain active even when permanent history recording is OFF.
+- Adds total observation count, disk usage, archive count, and oldest-history status.
+- Adds a manual **Rebuild History Index** maintenance control.
+- Automatically migrates v0.17.0-demo.1's legacy `loot-history.jsonl` into monthly archives and keeps the original as a `.bak` file after successful migration.
+- Retains all v0.17.0-demo.1 zone tracking/history UI and all v0.16.x updater/session/sync fixes.
+
+## v0.17.0-demo.1
+
+- Adds live zone tracking from Bastion/ROF2 `You have entered <zone>.` log messages.
+- Recovers the most recent known zone from the tail of the active log at companion startup.
+- Captures zone ID, instance ID, and zone version from Bastion PID/instance log messages when available.
+- Stamps every observed loot event with zone context.
+- Adds permanent local **Observed Loot History** stored separately from the active/resettable loot session.
+- Adds history filters for item, zone, looter, and Research classification.
+- Adds observed-event, unique-item, zone, and Research-related summary metrics.
+- Adds Top Zones and Top Items summaries.
+- Adds CSV export for persistent observed loot history.
+- Adds Zone columns to current-session CSV export and shows zone directly on Recent Loot.
+- Carries forward v0.16.7-demo.1 updater auto-refresh/in-place backup behavior and all v0.16.6 reliability fixes.
+
+## v0.16.7-demo.1
+
+- Automatically reloads the browser after the updated companion is verified running, so the top-right version badge and all build-stamped assets update without a manual refresh.
+- Changes updater backups from **moving/renaming the active install folder** to **copying its contents** into the rollback backup.
+- Keeps the active install root directory in place while replacing its contents.
+- Prevents an open Windows File Explorer window from following the application folder into the `_backup_...` directory during updates.
+- Updates rollback to restore backup contents into the existing install root.
+- Retains all v0.16.6 Live Loot, session reset, Bastion sync, cache, and icon improvements.
+
 ## v0.16.6
 
 - Fixes End Current Loot Session so cleared loot does not return.
