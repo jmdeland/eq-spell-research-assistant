@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.17.1-demo.1
+
+### Corpse Recovery Protection
+- Detects successful resurrection from the EverQuest log and arms corpse-recovery tracking for the first post-resurrection self-loot sequence.
+- Requires the first self-loot event to begin within 120 seconds after returning to the resurrection zone.
+- Keeps the recovery sequence active while self-loot continues, ending it after 60 seconds without another recovered item, after 10 minutes total, or on another zone transition.
+- Marks recovered loot as `corpse_recovery` in the live event/session record.
+- Shows **CORPSE RECOVERY — not counted as a new drop** in the Live Loot feed for easy field testing.
+- Keeps recovered items in the current recoverable session and CSV export for transparency.
+- Does not count recovered items as new session loot, provisional owned inventory, Research readiness progress, craftable alerts, or Research loot sounds.
+- Excludes recovered items from permanent Observed Loot History so corpse contents cannot be learned as drops from the recovery zone.
+- Applies the same detection logic to both the dedicated Live Event Worker and the main companion fallback parser.
+- Adds corpse-recovery status fields to live polling diagnostics.
+
 ## v0.17.0
 
 ### Zone Tracking & Observed Loot History
