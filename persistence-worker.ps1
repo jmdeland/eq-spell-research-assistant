@@ -49,6 +49,7 @@ function Append-History($items){
     $byMonth=@{};$written=0
     foreach($evt in @($items)){
         if($null -eq $evt){continue}
+        if(($evt.PSObject.Properties["excludeFromObservedHistory"] -and $evt.excludeFromObservedHistory) -or ($evt.PSObject.Properties["corpseRecovery"] -and $evt.corpseRecovery)){continue}
         if(-not $evt.historyId){$evt|Add-Member -NotePropertyName historyId -NotePropertyValue ([guid]::NewGuid().ToString("N")) -Force}
         if(-not $evt.historyRecordedAt){$evt|Add-Member -NotePropertyName historyRecordedAt -NotePropertyValue ((Get-Date).ToString("o")) -Force}
         $month=Get-HistoryMonthKey $evt
