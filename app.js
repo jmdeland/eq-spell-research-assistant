@@ -469,14 +469,14 @@ function openLootUseModal(entry){
 function closeLootUseModal(){$("#lootUseModal")?.classList.add("hidden");document.body.style.overflow="";}
 function renderLiveFeed(){
  const el=$("#liveLootFeed");if(!el)return;if(!liveLootFeed.length){el.innerHTML='<p class="muted">No live loot yet.</p>';return}
- el.innerHTML=liveLootFeed.slice(0,60).map((x,i)=>{const css=x.value==="HIGH VALUE"?"high":x.value==="KEEP"?"keep":x.value==="OTHER"?"other":x.value==="CHECKING"?"checking":"unknown";return `<div class="live-loot-row ${css} clickable" tabindex="0" data-loot-index="${i}" title="${x.uses?"Click to see Research uses":"Click for item details"}"><div class="live-loot-head"><strong>${esc(x.item)}</strong><span class="live-value ${css}">${x.value}</span></div><div class="live-loot-looter">Looted by: ${esc(x.looter||"Unknown")}</div><div class="live-loot-meta">${esc(x.timestamp)}${x.zone?` • ${esc(x.zone)}`:""}${x.uses?` • ${x.uses} verified use(s)`:""}</div>${x.ambiguous?`<div class="live-ambiguous">Multiple exact item IDs share this name; click to see all possibilities.</div>`:""}</div>`}).join("");
+ el.innerHTML=liveLootFeed.slice(0,60).map((x,i)=>{const css=x.value==="HIGH VALUE"?"high":x.value==="KEEP"?"keep":x.value==="OTHER"?"other":x.value==="CHECKING"?"checking":"unknown";const recovery=x.corpseRecovery?` • CORPSE RECOVERY — not counted as a new drop`:"";return `<div class="live-loot-row ${css} clickable" tabindex="0" data-loot-index="${i}" title="${x.uses?"Click to see Research uses":"Click for item details"}"><div class="live-loot-head"><strong>${esc(x.item)}</strong><span class="live-value ${css}">${x.value}</span></div><div class="live-loot-looter">Looted by: ${esc(x.looter||"Unknown")}</div><div class="live-loot-meta">${esc(x.timestamp)}${x.zone?` • ${esc(x.zone)}`:""}${recovery}${x.uses?` • ${x.uses} verified use(s)`:""}</div>${x.ambiguous?`<div class="live-ambiguous">Multiple exact item IDs share this name; click to see all possibilities.</div>`:""}</div>`}).join("");
  document.querySelectorAll(".live-loot-row.clickable").forEach(row=>{const open=()=>openLootUseModal(liveLootFeed[Number(row.dataset.lootIndex)]);row.onclick=open;row.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open()}}});
 }
 function csvCell(v){const s=String(v??"");return /[",\r\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s}
 function exportSessionLoot(){
- const headers=["Timestamp","Zone","Zone ID","Instance ID","Zone Version","Looter","Self","Item","Research Classification","Verified Uses","Ambiguous ID","Candidate Item IDs","Counted As Owned","Ownership Mode"];
+ const headers=["Timestamp","Zone","Zone ID","Instance ID","Zone Version","Looter","Self","Item","Loot Source","Observed History Eligible","Research Classification","Verified Uses","Ambiguous ID","Candidate Item IDs","Counted As Owned","Ownership Mode"];
  const rows=sessionLootEvents.map(x=>[
-  x.timestamp,x.zone||"",x.zoneId??"",x.instanceId??"",x.zoneVersion??"",x.looter,x.self?"Yes":"No",x.item,x.researchValue||"Non-Research/Unmapped",
+  x.timestamp,x.zone||"",x.zoneId??"",x.instanceId??"",x.zoneVersion??"",x.looter,x.self?"Yes":"No",x.item,x.lootSource||"observed",x.excludeFromObservedHistory?"No":"Yes",x.researchValue||"Non-Research/Unmapped",
   x.verifiedUses||0,x.ambiguous?"Yes":"No",x.candidateIds||"",x.countedAsOwned?"Yes":"No",
   x.ownershipMode==="COUNT"?"Count as owned":"Track only"
  ]);
@@ -546,11 +546,12 @@ function applySessionEvents(events){
  liveLootCounts=new Map();liveOwnedCounts=new Map();liveLootFeed=[];
  for(const e of sessionLootEvents){
   if(e.tracked===false)continue;
+  const corpseRecovery=!!e.corpseRecovery||String(e.lootSource||"").toLowerCase()==="corpse_recovery";
   const key=canonical(e.item);
-  liveLootCounts.set(key,(liveLootCounts.get(key)||0)+1);
-  if(e.countedAsOwned)liveOwnedCounts.set(key,(liveOwnedCounts.get(key)||0)+1);
+  if(!corpseRecovery)liveLootCounts.set(key,(liveLootCounts.get(key)||0)+1);
+  if(e.countedAsOwned&&!corpseRecovery)liveOwnedCounts.set(key,(liveOwnedCounts.get(key)||0)+1);
   const value=e.researchValue||"OTHER";
-  liveLootFeed.unshift({item:e.item,looter:e.looter||"Unknown",timestamp:e.timestamp||"",zone:e.zone||"",value,uses:Number(e.verifiedUses||0),ambiguous:!!e.ambiguous,ids:String(e.candidateIds||"").split("|").filter(Boolean).map(Number)});
+  liveLootFeed.unshift({item:e.item,looter:e.looter||"Unknown",timestamp:e.timestamp||"",zone:e.zone||"",value,uses:Number(e.verifiedUses||0),ambiguous:!!e.ambiguous,ids:String(e.candidateIds||"").split("|").filter(Boolean).map(Number),corpseRecovery});
  }
  liveLootFeed=liveLootFeed.slice(0,120);
  evaluate();renderLiveFeed();renderLiveSession();renderSummary();renderList();renderDetail();renderReverseLookup();
@@ -689,30 +690,31 @@ function processLootEvent(evt,{isReplay=false,deferRender=false,provisionalAccep
  }
  const s=liveSettings();
  const cls=classifyLoot(evt.item);
+ const corpseRecovery=!!evt?.corpseRecovery||String(evt?.lootSource||"").toLowerCase()==="corpse_recovery";
  const tracked=s.includeOthers||!!evt.self;
- const countedAsOwned=(s.ownershipMode==="COUNT")&&tracked;
+ const countedAsOwned=(s.ownershipMode==="COUNT")&&tracked&&!corpseRecovery;
  if(!isReplay){
   const sessionEntry={
    id:evt.id??null,sessionId:liveSessionId,timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",zoneId:evt.zoneId??currentZoneContext.zoneId??null,instanceId:evt.instanceId??currentZoneContext.instanceId??null,zoneVersion:evt.zoneVersion??currentZoneContext.zoneVersion??null,looter:evt.looter||"Unknown",self:!!evt.self,
-   item:evt.item||"",researchValue:cls.uses.length?cls.value:(/^words? of |^rune of |grimoire|compendium|memoir|writ|tome|signet|emblem|bolts|card of /i.test(evt.item)?"UNKNOWN":""),
+   item:evt.item||"",lootSource:corpseRecovery?"corpse_recovery":(evt.lootSource||"observed"),corpseRecovery,excludeFromObservedHistory:corpseRecovery||!!evt.excludeFromObservedHistory,researchValue:cls.uses.length?cls.value:(/^words? of |^rune of |grimoire|compendium|memoir|writ|tome|signet|emblem|bolts|card of /i.test(evt.item)?"UNKNOWN":""),
    verifiedUses:cls.uses.length,ambiguous:!!cls.ambiguous,candidateIds:(cls.ids||[]).join("|"),
    tracked,countedAsOwned,ownershipMode:s.ownershipMode,recordedAt:new Date().toISOString()
   };
   sessionLootEvents.push(sessionEntry);queueSessionEvent(sessionEntry);
-  if(observedHistoryEnabled){
+  if(observedHistoryEnabled&&!sessionEntry.excludeFromObservedHistory){
    observedLootHistory.unshift(sessionEntry);
    if(observedLootHistory.length>5000)observedLootHistory.length=5000;
   }
  }
  if(!tracked)return {processed:true,recipeChanged:false};
 
- const affectsRecipes=cls.uses.length>0;
+ const affectsRecipes=cls.uses.length>0&&!corpseRecovery;
  let before=null,newly=[];
  if(affectsRecipes&&!skipRecipeEvaluation)before=readySpellKeys();
 
  const key=canonical(evt.item);
- liveLootCounts.set(key,(liveLootCounts.get(key)||0)+1);
- if(!isReplay&&countedAsOwned)liveOwnedCounts.set(key,(liveOwnedCounts.get(key)||0)+1);
+ if(!corpseRecovery)liveLootCounts.set(key,(liveLootCounts.get(key)||0)+1);
+ if(!isReplay&&countedAsOwned&&!corpseRecovery)liveOwnedCounts.set(key,(liveOwnedCounts.get(key)||0)+1);
 
  if(affectsRecipes&&!skipRecipeEvaluation){
   evaluate();
@@ -722,11 +724,11 @@ function processLootEvent(evt,{isReplay=false,deferRender=false,provisionalAccep
 
  let feedEntry=null;
  if(cls.uses.length){
-  feedEntry={eventId:evt.id??null,item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",value:cls.value,uses:cls.uses.length,ambiguous:cls.ambiguous,ids:cls.ids};
-  if(liveEnabled){if(cls.value==="HIGH VALUE"&&s.soundHigh)beep("high");else if(s.soundAny)beep("research");}
+  feedEntry={eventId:evt.id??null,item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",value:cls.value,uses:cls.uses.length,ambiguous:cls.ambiguous,ids:cls.ids,corpseRecovery};
+  if(liveEnabled&&!corpseRecovery){if(cls.value==="HIGH VALUE"&&s.soundHigh)beep("high");else if(s.soundAny)beep("research");}
  }else if(!isReplay){
   const researchLooking=/^words? of |^rune of |grimoire|compendium|memoir|writ|tome|signet|emblem|bolts|card of /i.test(evt.item);
-  feedEntry={eventId:evt.id??null,item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",value:researchLooking?"UNKNOWN":"OTHER",uses:0,ambiguous:false,ids:[]};
+  feedEntry={eventId:evt.id??null,item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",value:researchLooking?"UNKNOWN":"OTHER",uses:0,ambiguous:false,ids:[],corpseRecovery};
  }
 
  if(feedEntry){
@@ -752,7 +754,7 @@ function acceptLiveEventImmediately(evt){
  if(tracked){
   liveLootFeed.unshift({
    eventId:id,item:evt.item||"Unknown item",looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",
-   zone:evt.zone||currentZoneContext.zone||"",value:"CHECKING",uses:0,ambiguous:false,ids:[]
+   zone:evt.zone||currentZoneContext.zone||"",value:"CHECKING",uses:0,ambiguous:false,ids:[],corpseRecovery:!!evt.corpseRecovery||String(evt.lootSource||"").toLowerCase()==="corpse_recovery"
   });
   if(liveLootFeed.length>120)liveLootFeed.length=120;
  }
