@@ -1,6 +1,6 @@
 {
-  "version": "0.17.0",
-  "channel": "stable",
+  "version": "0.17.1-demo.1",
+  "channel": "demo",
   "stableBaseVersion": "0.17.0",
   "schema": 1
 }
