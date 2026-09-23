@@ -1,0 +1,23 @@
+name: Package corpse recovery demo
+on:
+  push:
+    branches:
+      - demo-corpse-recovery-v0.17.1-demo.1
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare package
+        shell: bash
+        run: |
+          mkdir -p package/eq-spell-research-assistant
+          rsync -a --exclude='.git' --exclude='.github' ./ package/eq-spell-research-assistant/
+      - name: Upload demo package
+        uses: actions/upload-artifact@v4
+        with:
+          name: eq-spell-research-assistant-v0.17.1-demo.1
+          path: package/eq-spell-research-assistant
+          if-no-files-found: error
