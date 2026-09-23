@@ -445,6 +445,7 @@ function Initialize-ZoneContextFromLog {
         # Process the tail sequentially so an instance PID following the latest
         # "You have entered ..." line enriches that zone rather than an older one.
         foreach($line in ($text -split "`r?`n")){
+            [void](Update-CorpseRecoveryContextFromLine $line)
             [void](Update-ZoneContextFromLine $line)
         }
     }catch{}
