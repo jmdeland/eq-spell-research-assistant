@@ -2,7 +2,7 @@
 
 A local Windows companion for the **Bastion EverQuest server** that combines live loot monitoring, spell Research planning, Bastion Magelo inventory mapping, item lookup, session tracking, and safe self-updating.
 
-**Current stable release: v0.16.7-demo.1**
+**Current stable release: v0.17.2**
 
 > Built for EverQuest players who want to know, in real time, whether a drop matters for Research — and whether they already have what they need to make a spell.
 
@@ -420,13 +420,30 @@ Stable releases are published through GitHub Releases.
 
 
 
-# What's New in v0.17.0
+# What's New in v0.17.2
 
-- Live zone tracking, including exact instanced-zone identity.
-- Dedicated Observed Loot History workspace with permanent monthly archives.
-- Archive-aware history search and optional recording toggle.
-- Dedicated Live Event, persistence, and history-index workers to protect Live Loot responsiveness.
-- Session reset, updater, Bastion sync, and spell-icon reliability improvements retained.
+## Two-Character Magelo
+
+- Adds a **Primary Character** Magelo profile that is always included in Research readiness.
+- Adds an optional **Additional Character** profile that can be loaded independently and included or excluded from Research readiness without unloading it.
+- Preserves exact item IDs, stack quantities, character ownership, and player-friendly inventory/bank locations.
+- Adds Shared Bank deduplication so same-account shared storage is not counted twice when both profiles expose it.
+- Live provisional loot reconciles only against the Magelo profile matching the currently monitored EQ log character.
+
+## Session & Observed History Reliability
+
+- Fixes browser-to-persistence-worker CORS preflight handling on port 8766.
+- Restores current-session persistence and startup recovery data.
+- Restores permanent Observed Loot History writes while keeping persistence isolated from Live Loot delivery.
+
+## Corpse Recovery Protection — Still Under Field Testing
+
+- Adds detection for the post-resurrection self-loot sequence used when recovering equipment from your corpse.
+- Classified corpse-recovery items remain visible in Live Loot/session records for transparency.
+- Corpse-recovery items are excluded from permanent zone-based Observed Loot History and do not affect provisional Research ownership/readiness.
+- **This mechanic is included in v0.17.2 but is still being field-tested on Bastion.** If an edge case is found, it will be corrected in a follow-up release.
+
+---
 
 # Project
 

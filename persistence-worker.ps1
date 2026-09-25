@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory=$true)][int]$ParentPid
 )
 
@@ -49,6 +49,7 @@ function Append-History($items){
     $byMonth=@{};$written=0
     foreach($evt in @($items)){
         if($null -eq $evt){continue}
+        if(($evt.PSObject.Properties["excludeFromObservedHistory"] -and $evt.excludeFromObservedHistory) -or ($evt.PSObject.Properties["corpseRecovery"] -and $evt.corpseRecovery)){continue}
         if(-not $evt.historyId){$evt|Add-Member -NotePropertyName historyId -NotePropertyValue ([guid]::NewGuid().ToString("N")) -Force}
         if(-not $evt.historyRecordedAt){$evt|Add-Member -NotePropertyName historyRecordedAt -NotePropertyValue ((Get-Date).ToString("o")) -Force}
         $month=Get-HistoryMonthKey $evt
@@ -105,7 +106,14 @@ try{
         if(-not $task.IsCompleted){continue}
         $ctx=$task.Result;$req=$ctx.Request;$res=$ctx.Response
         try{
-            if($req.HttpMethod -eq "OPTIONS"){$res.StatusCode=204;continue}
+            if($req.HttpMethod -eq "OPTIONS"){
+                $res.Headers["Access-Control-Allow-Origin"]="*"
+                $res.Headers["Access-Control-Allow-Methods"]="GET, POST, OPTIONS"
+                $res.Headers["Access-Control-Allow-Headers"]="Content-Type"
+                $res.StatusCode=204
+                $res.ContentLength64=0
+                continue
+            }
             $path=$req.Url.AbsolutePath
             if($path -eq "/api/session-events"){
                 $body=Read-JsonRequest $req

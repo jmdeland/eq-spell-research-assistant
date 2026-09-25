@@ -121,7 +121,7 @@ function Strip-Html([string]$html) {
     return ([regex]::Replace($x,'\s+',' ')).Trim()
 }
 function Invoke-Bastion([string]$url) {
-    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Research-Loot-Tool/0.17.0"}).Content
+    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Research-Loot-Tool/0.17.2"}).Content
 }
 function Parse-RecipePage([int]$id,[string]$html) {
     $plain=Strip-Html $html
@@ -305,6 +305,83 @@ $script:currentZoneEnteredAt=$null
 $script:lastZoneEntryLogTime=$null
 $script:currentZoneIsGenericInstance=$false
 
+# Corpse recovery protection. A successful resurrection arms a short window for
+# the first self-loot sequence after the return zone. Recovered items remain in
+# the current session for transparency, but are marked so the browser/backend
+# can exclude them from observed-drop history and ownership calculations.
+$script:corpseRecoveryPending=$false
+$script:corpseRecoveryActive=$false
+$script:corpseRecoveryActivatedAt=$null
+$script:corpseRecoveryLastLootAt=$null
+$script:corpseRecoveryFirstLootSeen=$false
+$script:corpseRecoveryStartWindowSeconds=120
+$script:corpseRecoveryIdleWindowSeconds=60
+$script:corpseRecoveryMaxWindowSeconds=600
+
+function Reset-CorpseRecoveryContext {
+    $script:corpseRecoveryPending=$false
+    $script:corpseRecoveryActive=$false
+    $script:corpseRecoveryActivatedAt=$null
+    $script:corpseRecoveryLastLootAt=$null
+    $script:corpseRecoveryFirstLootSeen=$false
+}
+function Update-CorpseRecoveryContextFromLine([string]$line) {
+    if(-not $line){return}
+
+    $res=[regex]::Match($line,'^\[(?<time>[^\]]+)\]\s*You regain experience from resurrection\.')
+    if($res.Success){
+        $script:corpseRecoveryPending=$true
+        $script:corpseRecoveryActive=$false
+        $script:corpseRecoveryActivatedAt=$null
+        $script:corpseRecoveryLastLootAt=$null
+        $script:corpseRecoveryFirstLootSeen=$false
+        return
+    }
+
+    $zone=[regex]::Match($line,'^\[(?<time>[^\]]+)\]\s*You have entered (?<zone>.+?)\.\s*$')
+    if($zone.Success){
+        $t=Parse-EqLogTime $zone.Groups['time'].Value
+        if($script:corpseRecoveryPending){
+            $script:corpseRecoveryPending=$false
+            $script:corpseRecoveryActive=$true
+            $script:corpseRecoveryActivatedAt=$(if($t){$t}else{Get-Date})
+            $script:corpseRecoveryLastLootAt=$null
+            $script:corpseRecoveryFirstLootSeen=$false
+            return
+        }
+        # A second zone transition ends any unfinished recovery window.
+        if($script:corpseRecoveryActive){Reset-CorpseRecoveryContext}
+    }
+}
+function Get-CorpseRecoveryLootState([string]$timestamp) {
+    if(-not $script:corpseRecoveryActive){return $false}
+    $t=Parse-EqLogTime $timestamp
+    if(-not $t){$t=Get-Date}
+
+    if($script:corpseRecoveryActivatedAt){
+        $age=($t-$script:corpseRecoveryActivatedAt).TotalSeconds
+        if($age -gt $script:corpseRecoveryMaxWindowSeconds){
+            Reset-CorpseRecoveryContext
+            return $false
+        }
+        if(-not $script:corpseRecoveryFirstLootSeen -and $age -gt $script:corpseRecoveryStartWindowSeconds){
+            Reset-CorpseRecoveryContext
+            return $false
+        }
+    }
+    if($script:corpseRecoveryFirstLootSeen -and $script:corpseRecoveryLastLootAt){
+        $idle=($t-$script:corpseRecoveryLastLootAt).TotalSeconds
+        if($idle -gt $script:corpseRecoveryIdleWindowSeconds){
+            Reset-CorpseRecoveryContext
+            return $false
+        }
+    }
+
+    $script:corpseRecoveryFirstLootSeen=$true
+    $script:corpseRecoveryLastLootAt=$t
+    return $true
+}
+
 function Test-GenericInstanceZoneName([string]$zone) {
     if([string]::IsNullOrWhiteSpace($zone)){return $false}
     $z=$zone.Trim()
@@ -368,6 +445,7 @@ function Initialize-ZoneContextFromLog {
         # Process the tail sequentially so an instance PID following the latest
         # "You have entered ..." line enriches that zone rather than an older one.
         foreach($line in ($text -split "`r?`n")){
+            [void](Update-CorpseRecoveryContextFromLine $line)
             [void](Update-ZoneContextFromLine $line)
         }
     }catch{}
@@ -423,9 +501,15 @@ function Read-NewLoot {
         if($parts.Count -gt 1){$parts=$parts[0..($parts.Count-2)]}else{$parts=@()}
     }else{$carry=""}
     foreach($line in $parts){
+        [void](Update-CorpseRecoveryContextFromLine $line)
         [void](Update-ZoneContextFromLine $line)
         $evt=Parse-LootLine $line
         if($evt){
+            $isCorpseRecovery=$false
+            if($evt.self){$isCorpseRecovery=Get-CorpseRecoveryLootState ([string]$evt.timestamp)}
+            $evt|Add-Member -NotePropertyName corpseRecovery -NotePropertyValue $isCorpseRecovery -Force
+            $evt|Add-Member -NotePropertyName lootSource -NotePropertyValue $(if($isCorpseRecovery){"corpse_recovery"}else{"observed"}) -Force
+            $evt|Add-Member -NotePropertyName excludeFromObservedHistory -NotePropertyValue $isCorpseRecovery -Force
             $evt|Add-Member -NotePropertyName id -NotePropertyValue $nextId -Force
             $evt|Add-Member -NotePropertyName detectedAt -NotePropertyValue ((Get-Date).ToString("o")) -Force
             [void]$events.Add($evt);$nextId++
@@ -651,7 +735,7 @@ function Convert-VersionCore([string]$version){
     return [version]("{0}.{1}.{2}" -f $parts[0],$parts[1],$parts[2])
 }
 function Get-LatestGitHubRelease {
-    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.17.0";"Accept"="application/vnd.github+json"}
+    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.17.2";"Accept"="application/vnd.github+json"}
     return Invoke-RestMethod -UseBasicParsing -Uri $updateApi -TimeoutSec 45 -Headers $headers
 }
 function Get-UpdateInfo {
@@ -691,7 +775,7 @@ function Download-AndVerifyLatestUpdate {
     $dest=Join-Path $updateStage $info.assetName
     $tmp=$dest+".download"
     if(Test-Path -LiteralPath $tmp){Remove-Item -LiteralPath $tmp -Force}
-    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.17.0"}
+    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.17.2"}
     try{
         Invoke-WebRequest -UseBasicParsing -Uri $info.assetUrl -OutFile $tmp -TimeoutSec 120 -Headers $headers
         $actual=(Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -1052,6 +1136,7 @@ function Append-LootHistoryEvents($items) {
     $byMonth=@{}
     foreach($evt in $batch){
         if($null -eq $evt){continue}
+        if(($evt.PSObject.Properties["excludeFromObservedHistory"] -and $evt.excludeFromObservedHistory) -or ($evt.PSObject.Properties["corpseRecovery"] -and $evt.corpseRecovery)){continue}
         if(-not $evt.historyId){$evt|Add-Member -NotePropertyName historyId -NotePropertyValue ([guid]::NewGuid().ToString("N")) -Force}
         if(-not $evt.historyRecordedAt){$evt|Add-Member -NotePropertyName historyRecordedAt -NotePropertyValue ((Get-Date).ToString("o")) -Force}
         $month=Get-HistoryMonthKey $evt
@@ -1271,7 +1356,7 @@ Start-LiveEventWorker
 
 $shutdownForUpdate=$false
 $listener=New-Object Net.HttpListener;$prefix="http://127.0.0.1:$port/";$listener.Prefixes.Add($prefix);$listener.Start()
-Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.17.0";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
+Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.17.2";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
 
 try{
 while($listener.IsListening){
@@ -1418,6 +1503,10 @@ while($listener.IsListening){
                     currentZoneVersion=$script:currentZoneVersion
                     currentZoneEnteredAt=$script:currentZoneEnteredAt
                     observedLootHistoryEnabled=($config.observedLootHistoryEnabled -ne $false)
+                    corpseRecoveryPending=[bool]$script:corpseRecoveryPending
+                    corpseRecoveryActive=[bool]$script:corpseRecoveryActive
+                    corpseRecoveryFirstLootSeen=[bool]$script:corpseRecoveryFirstLootSeen
+                    corpseRecoveryLastLootAt=$(if($script:corpseRecoveryLastLootAt){$script:corpseRecoveryLastLootAt.ToString("o")}else{$null})
                     staleSessionRejects=[int]$script:staleSessionRejects
                     events=$selected
                     serverTime=(Get-Date).ToString("o")

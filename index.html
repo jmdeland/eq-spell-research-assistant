@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 
 <html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/>
-<title>EverQuest Research &amp; Loot Tool</title><link href="styles.css?v=0.17.0" rel="stylesheet"/></head><body>
-<header class="app-hero"><div class="hero-shell"><div class="brand-mark" aria-hidden="true"><span class="brand-mark-star">✦</span><span class="brand-mark-ring"></span></div><div class="brand-copy"><div class="eyebrow">EVERQUEST RESEARCH &amp; LOOT TOOL <span class="byline">by Bromm</span></div><h1><span>Spell Research Assistant</span><span class="title-join">&amp;</span><span class="title-accent">Live Loot Monitor</span></h1><p>Track drops as they happen, locate useful components, and turn your inventory into research-ready spells.</p><div class="hero-badges" aria-label="Primary tools"><span><i class="hero-dot live"></i>Live Loot</span><span>Inventory Mapping</span><span>Spell Research</span></div></div><div class="header-actions"><div class="version">v0.17.0</div><button aria-label="Open Settings" class="settings-button" id="openSettings" type="button">⚙ Settings<span class="settings-update-dot hidden" id="settingsUpdateDot" title="Update available" aria-label="Update available"></span></button></div></div></header>
+<title>EverQuest Research &amp; Loot Tool</title><link href="styles.css?v=0.17.2" rel="stylesheet"/></head><body>
+<header class="app-hero"><div class="hero-shell"><div class="brand-mark" aria-hidden="true"><span class="brand-mark-star">✦</span><span class="brand-mark-ring"></span></div><div class="brand-copy"><div class="eyebrow">EVERQUEST RESEARCH &amp; LOOT TOOL <span class="byline">by Bromm</span></div><h1><span>Spell Research Assistant</span><span class="title-join">&amp;</span><span class="title-accent">Live Loot Monitor</span></h1><p>Track drops as they happen, locate useful components, and turn your inventory into research-ready spells.</p><div class="hero-badges" aria-label="Primary tools"><span><i class="hero-dot live"></i>Live Loot</span><span>Inventory Mapping</span><span>Spell Research</span></div></div><div class="header-actions"><div class="version">v0.17.2</div><button aria-label="Open Settings" class="settings-button" id="openSettings" type="button">⚙ Settings<span class="settings-update-dot hidden" id="settingsUpdateDot" title="Update available" aria-label="Update available"></span></button></div></div></header>
 <nav class="app-workspace-nav" aria-label="Application workspaces">
 <div class="workspace-nav-inner">
 <button class="workspace-nav-button active" id="navHome" type="button" aria-current="page">Live &amp; Research</button>
@@ -62,17 +62,34 @@
 <section class="setup-workspace">
 <section class="panel magelo-panel workspace-card inventory-card">
 <div class="panel-title">
-<div><h2>Inventory</h2><p>Primary inventory source. Enter a Bastion character name or full Magelo URL, then refresh to load inventory, bank, and shared bank when public.</p></div>
+<div><h2>Inventory</h2><p>Load up to two Bastion Magelo profiles. The Primary Character always counts toward Research readiness; the Additional Character can be included or excluded without unloading it.</p></div>
 <span class="live-status offline" id="mageloStatusBadge">NOT LOADED</span>
 </div>
+<div class="magelo-profile-grid">
+<div class="magelo-profile-card">
+<div class="magelo-profile-heading"><strong>Primary Character</strong><small>Always included in Research readiness</small></div>
 <div class="magelo-controls">
-<input id="mageloCharacter" placeholder="charactername or https://characters.bastiongame.com/character/charactername"/>
-<button id="refreshMagelo">Load / Refresh Magelo</button>
-<button class="ghost" id="inventoryFileInstead">Use Inventory Output File Instead</button>
-<button class="ghost" id="clearMagelo">Clear Magelo</button>
-<input accept=".txt,.csv,.tsv" hidden="" id="inventoryFiles" multiple="" type="file"/>
+<input id="mageloPrimaryCharacter" placeholder="charactername or full Bastion Magelo URL"/>
+<button id="refreshMageloPrimary">Load / Refresh</button>
+<button class="ghost" id="clearMageloPrimary">Clear</button>
 </div>
-<div class="status muted" id="mageloStatus">No Magelo character loaded yet.</div>
+<div class="status muted" id="mageloPrimaryStatus">No primary Magelo loaded.</div>
+</div>
+<div class="magelo-profile-card">
+<div class="magelo-profile-heading"><strong>Additional Character</strong><small>Optional second Bastion Magelo profile</small></div>
+<div class="magelo-controls">
+<input id="mageloAdditionalCharacter" placeholder="charactername or full Bastion Magelo URL"/>
+<button id="refreshMageloAdditional">Load / Refresh</button>
+<button class="ghost" id="clearMageloAdditional">Clear</button>
+</div>
+<div class="status muted" id="mageloAdditionalStatus">No additional Magelo loaded.</div>
+</div>
+</div>
+<div class="magelo-options">
+<label class="check-card"><input checked="" id="includeAdditionalMagelo" type="checkbox"/><span><strong>Include additional character in Research readiness</strong><small>Turn this off to keep the second profile loaded without counting its inventory.</small></span></label>
+<label class="check-card"><input checked="" id="treatSharedBankSame" type="checkbox"/><span><strong>Treat Shared Bank as the same shared storage for both profiles</strong><small>Recommended for characters on the same account; prevents duplicate shared-bank counts.</small></span></label>
+</div>
+<div class="magelo-file-fallback"><button class="ghost" id="inventoryFileInstead">Use Inventory Output File Instead</button><input accept=".txt,.csv,.tsv" hidden="" id="inventoryFiles" multiple="" type="file"/></div>
 <div class="status muted" id="inventoryFileStatus"></div>
 <div class="summary-grid compact-summary" id="mageloStats"></div>
 </section>
@@ -190,6 +207,6 @@
 <button class="danger" disabled="" id="installVerifiedUpdate">Install Update</button>
 <a class="button-link ghost hidden" href="#" id="openReleasePage" rel="noopener" target="_blank">Open Release Page ↗</a>
 </div><div class="update-version-grid" id="updateVersionGrid">
-<div><span>Installed version</span><strong id="installedAppVersion">v0.17.0</strong></div>
+<div><span>Installed version</span><strong id="installedAppVersion">v0.17.2</strong></div>
 <div><span>Latest stable</span><strong id="latestStableVersion">Not checked</strong></div>
-</div><div class="status muted" id="updateStatus">Updater ready. Check GitHub for a newer stable release.</div><div class="update-result-card hidden" id="previousUpdateResult"></div><div class="update-backup-summary hidden" id="backupSummary"></div><div class="update-progress hidden" id="updateProgress"><div id="updateProgressBar"></div></div><div class="update-release-notes hidden" id="updateReleaseNotes"></div></section><section class="settings-section"><div class="settings-section-title"><h3>Advanced / Data Tools</h3><p>Evidence queue and dataset diagnostics intended for troubleshooting and data maintenance.</p></div><div class="advanced-grid"><div><h3>Research Evidence Queue</h3><div id="evidenceQueue"></div></div><div><h3>Dataset Audit</h3><div class="summary-grid" id="auditCards"></div><div id="auditDetails"></div></div></div></section></div></section></div><script src="data/recipes.js?v=0.17.0"></script><script src="data/bastion-recipes.js?v=0.17.0"></script><script src="data/spell-catalog.js?v=0.17.0"></script><script src="data/spell-icons.js?v=0.17.0"></script><script src="app.js?v=0.17.0"></script><script src="settings.js?v=0.17.0"></script></body></html>
+</div><div class="status muted" id="updateStatus">Updater ready. Check GitHub for a newer stable release.</div><div class="update-result-card hidden" id="previousUpdateResult"></div><div class="update-backup-summary hidden" id="backupSummary"></div><div class="update-progress hidden" id="updateProgress"><div id="updateProgressBar"></div></div><div class="update-release-notes hidden" id="updateReleaseNotes"></div></section><section class="settings-section"><div class="settings-section-title"><h3>Advanced / Data Tools</h3><p>Evidence queue and dataset diagnostics intended for troubleshooting and data maintenance.</p></div><div class="advanced-grid"><div><h3>Research Evidence Queue</h3><div id="evidenceQueue"></div></div><div><h3>Dataset Audit</h3><div class="summary-grid" id="auditCards"></div><div id="auditDetails"></div></div></div></section></div></section></div><script src="data/recipes.js?v=0.17.2"></script><script src="data/bastion-recipes.js?v=0.17.2"></script><script src="data/spell-catalog.js?v=0.17.2"></script><script src="data/spell-icons.js?v=0.17.2"></script><script src="app.js?v=0.17.2"></script><script src="settings.js?v=0.17.2"></script></body></html>

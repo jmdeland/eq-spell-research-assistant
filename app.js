@@ -13,7 +13,11 @@ function apiUrl(path){
  return onCompanion?path:`${LIVE_COMPANION_ORIGIN}${path}`;
 }
 
-let ACTIVE_DATA=BASTION_DATA,inventory=[],aggregated=[],inventorySources=[],mageloInventory=[],mageloPlacements=[],mageloMeta=null,recipeResults=[],selectedKey=null,liveLootCounts=new Map(),liveOwnedCounts=new Map(),sessionLootEvents=[],previousMageloCounts=null,liveLootFeed=[],liveLastEventId=0,liveEnabled=true,liveAudioCtx=null,liveMonitorOnline=false,corpusSyncInProgress=false,livePollInFlight=false,liveSessionEpoch=0,sessionResetInProgress=false,liveSessionId=null,processedLiveEventIds=new Set(),pendingLiveEventIds=new Set(),pendingLiveEvents=[],pendingLiveProcessTimer=null,liveClassificationCache=new Map(),observedLootHistory=[],lootHistoryLoaded=false,historySummaryLoaded=false,historySummaryInFlight=false,historySummaryLastFetch=0,observedHistoryEnabled=true,historyQueryTimer=null,currentZoneContext={zone:"",zoneId:null,instanceId:null,zoneVersion:null,enteredAt:null},sessionRecoveryPending=true,sessionRecoveryChecked=false,autoUpdateCheckStarted=false;
+let ACTIVE_DATA=BASTION_DATA,inventory=[],aggregated=[],inventorySources=[],mageloInventory=[],mageloPlacements=[],mageloMeta=null,recipeResults=[],selectedKey=null,liveLootCounts=new Map(),liveOwnedCounts=new Map(),sessionLootEvents=[],previousMageloCounts=null,liveLootFeed=[],liveLastEventId=0,liveEnabled=true,liveAudioCtx=null,liveMonitorOnline=false,corpusSyncInProgress=false,livePollInFlight=false,liveSessionEpoch=0,sessionResetInProgress=false,liveSessionId=null,processedLiveEventIds=new Set(),pendingLiveEventIds=new Set(),pendingLiveEvents=[],pendingLiveProcessTimer=null,liveClassificationCache=new Map(),observedLootHistory=[],lootHistoryLoaded=false,historySummaryLoaded=false,historySummaryInFlight=false,historySummaryLastFetch=0,observedHistoryEnabled=true,historyQueryTimer=null,currentZoneContext={zone:"",zoneId:null,instanceId:null,zoneVersion:null,enteredAt:null},sessionRecoveryPending=true,sessionRecoveryChecked=false,autoUpdateCheckStarted=false,liveLogCharacter="",includeAdditionalMagelo=true,treatSharedBankAsSame=true;
+const mageloProfiles={
+ primary:{slot:"primary",meta:null,inventory:[],placements:[],previousCounts:null},
+ additional:{slot:"additional",meta:null,inventory:[],placements:[],previousCounts:null}
+};
 const $=s=>document.querySelector(s),norm=s=>(s||"").toLowerCase().replace(/[’']/g,"`").replace(/\s+/g," ").trim();
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 function canonical(s){let n=norm(s);if(n.startsWith("spell: "))n=n.slice(7);return(ACTIVE_DATA.aliases||{})[n]||n}
@@ -75,7 +79,37 @@ function filenameCharacter(n){return n.replace(/\.(txt|tsv|csv)$/i,"").replace(/
 function rkey(r){return r.recipeKey||((r.recipeId!=null)?`bastion:${r.recipeId}`:`${r.class||"ALL"}:${r.spell}:${r.trivial??"?"}`)}
 function parseInventory(text,source){const lines=text.replace(/\r/g,"").split("\n").filter(x=>x.trim());if(!lines.length)throw Error("Empty file.");const d=lines[0].includes("\t")?"\t":",",h=lines[0].split(d).map(x=>x.trim().toLowerCase()),i=k=>h.indexOf(k);if(i("name")<0||i("id")<0||i("count")<0)throw Error("Could not find Name, ID and Count columns.");return lines.slice(1).map(l=>{const c=l.split(d);return{source,name:(c[i("name")]||"").trim(),id:Number(c[i("id")]||0),count:Number(c[i("count")]||0)}}).filter(x=>x.name&&x.name!=="Empty"&&x.id&&x.count>0)}
 function aggregate(items){const m=new Map();for(const x of items){const k=`id:${x.id}`;if(!m.has(k))m.set(k,{name:x.name,id:x.id,count:0});m.get(k).count+=x.count}return[...m.values()]}
-function rebuildAggregated(){aggregated=aggregate([...inventory,...mageloInventory]);invalidateAutocomplete("items")}
+function isSharedBankItem(x){return x&&String(x.location||"").toLowerCase()==="shared bank"}
+function mageloProfileIncluded(slot){return slot==="primary"||(slot==="additional"&&includeAdditionalMagelo)}
+function rebuildCombinedMagelo(){
+ const included=[mageloProfiles.primary,...(includeAdditionalMagelo?[mageloProfiles.additional]:[])].filter(p=>p.meta);
+ const ordinary=[];
+ const sharedById=new Map();
+ const placements=[];
+ const sharedPlacementKeys=new Set();
+ for(const profile of included){
+  for(const x of profile.inventory){
+   const row={...x,profileSlot:profile.slot,character:x.character||profile.meta?.character||""};
+   if(treatSharedBankAsSame&&isSharedBankItem(row)){
+    const id=Number(row.id);const prev=sharedById.get(id);
+    if(!prev||Number(row.count||0)>Number(prev.count||0))sharedById.set(id,{...row,character:"Shared Bank",sharedStorage:true});
+   }else ordinary.push(row);
+  }
+  for(const p of profile.placements){
+   const row={...p,profileSlot:profile.slot,character:p.character||profile.meta?.character||""};
+   if(treatSharedBankAsSame&&isSharedBankItem(row)){
+    const k=[row.id,row.locationLabel||row.location,row.containerNumber??"",row.bagSlot??"",row.parentId??"",row.count??1].join("|");
+    if(sharedPlacementKeys.has(k))continue;
+    sharedPlacementKeys.add(k);placements.push({...row,character:"Shared Bank",sharedStorage:true});
+   }else placements.push(row);
+  }
+ }
+ mageloInventory=[...ordinary,...sharedById.values()];
+ mageloPlacements=placements;
+ mageloMeta=mageloProfiles.primary.meta||mageloProfiles.additional.meta||null;
+ previousMageloCounts=mageloProfiles.primary.previousCounts;
+}
+function rebuildAggregated(){rebuildCombinedMagelo();aggregated=aggregate([...inventory,...mageloInventory]);invalidateAutocomplete("items")}
 function vendor(c){return $("#vendorBasics").checked&&c.vendorBasic}
 function knownIdsForName(name){
  const ids=new Set();
@@ -170,9 +204,9 @@ function mageloPlacementMatchesComponent(p,c){
 }
 function placementLabel(p){
  if(!p)return "";
- if(p.locationLabel)return p.locationLabel;
- if(p.location==="Gear")return "Equipped";
- return p.location||"Inventory";
+ const base=p.locationLabel||(p.location==="Gear"?"Equipped":(p.location||"Inventory"));
+ if(p.sharedStorage||p.character==="Shared Bank")return `Shared Bank — ${base}`;
+ return p.character?`${p.character} — ${base}`:base;
 }
 function componentLocationInfo(c){
  if(c.assumed)return {short:"Vendor",all:["Vendor"]};
@@ -469,14 +503,14 @@ function openLootUseModal(entry){
 function closeLootUseModal(){$("#lootUseModal")?.classList.add("hidden");document.body.style.overflow="";}
 function renderLiveFeed(){
  const el=$("#liveLootFeed");if(!el)return;if(!liveLootFeed.length){el.innerHTML='<p class="muted">No live loot yet.</p>';return}
- el.innerHTML=liveLootFeed.slice(0,60).map((x,i)=>{const css=x.value==="HIGH VALUE"?"high":x.value==="KEEP"?"keep":x.value==="OTHER"?"other":x.value==="CHECKING"?"checking":"unknown";return `<div class="live-loot-row ${css} clickable" tabindex="0" data-loot-index="${i}" title="${x.uses?"Click to see Research uses":"Click for item details"}"><div class="live-loot-head"><strong>${esc(x.item)}</strong><span class="live-value ${css}">${x.value}</span></div><div class="live-loot-looter">Looted by: ${esc(x.looter||"Unknown")}</div><div class="live-loot-meta">${esc(x.timestamp)}${x.zone?` • ${esc(x.zone)}`:""}${x.uses?` • ${x.uses} verified use(s)`:""}</div>${x.ambiguous?`<div class="live-ambiguous">Multiple exact item IDs share this name; click to see all possibilities.</div>`:""}</div>`}).join("");
+ el.innerHTML=liveLootFeed.slice(0,60).map((x,i)=>{const css=x.value==="HIGH VALUE"?"high":x.value==="KEEP"?"keep":x.value==="OTHER"?"other":x.value==="CHECKING"?"checking":"unknown";const recovery=x.corpseRecovery?` • CORPSE RECOVERY — not counted as a new drop`:"";return `<div class="live-loot-row ${css} clickable" tabindex="0" data-loot-index="${i}" title="${x.uses?"Click to see Research uses":"Click for item details"}"><div class="live-loot-head"><strong>${esc(x.item)}</strong><span class="live-value ${css}">${x.value}</span></div><div class="live-loot-looter">Looted by: ${esc(x.looter||"Unknown")}</div><div class="live-loot-meta">${esc(x.timestamp)}${x.zone?` • ${esc(x.zone)}`:""}${recovery}${x.uses?` • ${x.uses} verified use(s)`:""}</div>${x.ambiguous?`<div class="live-ambiguous">Multiple exact item IDs share this name; click to see all possibilities.</div>`:""}</div>`}).join("");
  document.querySelectorAll(".live-loot-row.clickable").forEach(row=>{const open=()=>openLootUseModal(liveLootFeed[Number(row.dataset.lootIndex)]);row.onclick=open;row.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open()}}});
 }
 function csvCell(v){const s=String(v??"");return /[",\r\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s}
 function exportSessionLoot(){
- const headers=["Timestamp","Zone","Zone ID","Instance ID","Zone Version","Looter","Self","Item","Research Classification","Verified Uses","Ambiguous ID","Candidate Item IDs","Counted As Owned","Ownership Mode"];
+ const headers=["Timestamp","Zone","Zone ID","Instance ID","Zone Version","Looter","Self","Item","Loot Source","Observed History Eligible","Research Classification","Verified Uses","Ambiguous ID","Candidate Item IDs","Counted As Owned","Ownership Mode"];
  const rows=sessionLootEvents.map(x=>[
-  x.timestamp,x.zone||"",x.zoneId??"",x.instanceId??"",x.zoneVersion??"",x.looter,x.self?"Yes":"No",x.item,x.researchValue||"Non-Research/Unmapped",
+  x.timestamp,x.zone||"",x.zoneId??"",x.instanceId??"",x.zoneVersion??"",x.looter,x.self?"Yes":"No",x.item,x.lootSource||"observed",x.excludeFromObservedHistory?"No":"Yes",x.researchValue||"Non-Research/Unmapped",
   x.verifiedUses||0,x.ambiguous?"Yes":"No",x.candidateIds||"",x.countedAsOwned?"Yes":"No",
   x.ownershipMode==="COUNT"?"Count as owned":"Track only"
  ]);
@@ -546,11 +580,12 @@ function applySessionEvents(events){
  liveLootCounts=new Map();liveOwnedCounts=new Map();liveLootFeed=[];
  for(const e of sessionLootEvents){
   if(e.tracked===false)continue;
+  const corpseRecovery=!!e.corpseRecovery||String(e.lootSource||"").toLowerCase()==="corpse_recovery";
   const key=canonical(e.item);
-  liveLootCounts.set(key,(liveLootCounts.get(key)||0)+1);
-  if(e.countedAsOwned)liveOwnedCounts.set(key,(liveOwnedCounts.get(key)||0)+1);
+  if(!corpseRecovery)liveLootCounts.set(key,(liveLootCounts.get(key)||0)+1);
+  if(e.countedAsOwned&&!corpseRecovery)liveOwnedCounts.set(key,(liveOwnedCounts.get(key)||0)+1);
   const value=e.researchValue||"OTHER";
-  liveLootFeed.unshift({item:e.item,looter:e.looter||"Unknown",timestamp:e.timestamp||"",zone:e.zone||"",value,uses:Number(e.verifiedUses||0),ambiguous:!!e.ambiguous,ids:String(e.candidateIds||"").split("|").filter(Boolean).map(Number)});
+  liveLootFeed.unshift({item:e.item,looter:e.looter||"Unknown",timestamp:e.timestamp||"",zone:e.zone||"",value,uses:Number(e.verifiedUses||0),ambiguous:!!e.ambiguous,ids:String(e.candidateIds||"").split("|").filter(Boolean).map(Number),corpseRecovery});
  }
  liveLootFeed=liveLootFeed.slice(0,120);
  evaluate();renderLiveFeed();renderLiveSession();renderSummary();renderList();renderDetail();renderReverseLookup();
@@ -689,30 +724,31 @@ function processLootEvent(evt,{isReplay=false,deferRender=false,provisionalAccep
  }
  const s=liveSettings();
  const cls=classifyLoot(evt.item);
+ const corpseRecovery=!!evt?.corpseRecovery||String(evt?.lootSource||"").toLowerCase()==="corpse_recovery";
  const tracked=s.includeOthers||!!evt.self;
- const countedAsOwned=(s.ownershipMode==="COUNT")&&tracked;
+ const countedAsOwned=(s.ownershipMode==="COUNT")&&tracked&&!corpseRecovery;
  if(!isReplay){
   const sessionEntry={
    id:evt.id??null,sessionId:liveSessionId,timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",zoneId:evt.zoneId??currentZoneContext.zoneId??null,instanceId:evt.instanceId??currentZoneContext.instanceId??null,zoneVersion:evt.zoneVersion??currentZoneContext.zoneVersion??null,looter:evt.looter||"Unknown",self:!!evt.self,
-   item:evt.item||"",researchValue:cls.uses.length?cls.value:(/^words? of |^rune of |grimoire|compendium|memoir|writ|tome|signet|emblem|bolts|card of /i.test(evt.item)?"UNKNOWN":""),
+   item:evt.item||"",lootSource:corpseRecovery?"corpse_recovery":(evt.lootSource||"observed"),corpseRecovery,excludeFromObservedHistory:corpseRecovery||!!evt.excludeFromObservedHistory,researchValue:cls.uses.length?cls.value:(/^words? of |^rune of |grimoire|compendium|memoir|writ|tome|signet|emblem|bolts|card of /i.test(evt.item)?"UNKNOWN":""),
    verifiedUses:cls.uses.length,ambiguous:!!cls.ambiguous,candidateIds:(cls.ids||[]).join("|"),
    tracked,countedAsOwned,ownershipMode:s.ownershipMode,recordedAt:new Date().toISOString()
   };
   sessionLootEvents.push(sessionEntry);queueSessionEvent(sessionEntry);
-  if(observedHistoryEnabled){
+  if(observedHistoryEnabled&&!sessionEntry.excludeFromObservedHistory){
    observedLootHistory.unshift(sessionEntry);
    if(observedLootHistory.length>5000)observedLootHistory.length=5000;
   }
  }
  if(!tracked)return {processed:true,recipeChanged:false};
 
- const affectsRecipes=cls.uses.length>0;
+ const affectsRecipes=cls.uses.length>0&&!corpseRecovery;
  let before=null,newly=[];
  if(affectsRecipes&&!skipRecipeEvaluation)before=readySpellKeys();
 
  const key=canonical(evt.item);
- liveLootCounts.set(key,(liveLootCounts.get(key)||0)+1);
- if(!isReplay&&countedAsOwned)liveOwnedCounts.set(key,(liveOwnedCounts.get(key)||0)+1);
+ if(!corpseRecovery)liveLootCounts.set(key,(liveLootCounts.get(key)||0)+1);
+ if(!isReplay&&countedAsOwned&&!corpseRecovery)liveOwnedCounts.set(key,(liveOwnedCounts.get(key)||0)+1);
 
  if(affectsRecipes&&!skipRecipeEvaluation){
   evaluate();
@@ -722,11 +758,11 @@ function processLootEvent(evt,{isReplay=false,deferRender=false,provisionalAccep
 
  let feedEntry=null;
  if(cls.uses.length){
-  feedEntry={eventId:evt.id??null,item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",value:cls.value,uses:cls.uses.length,ambiguous:cls.ambiguous,ids:cls.ids};
-  if(liveEnabled){if(cls.value==="HIGH VALUE"&&s.soundHigh)beep("high");else if(s.soundAny)beep("research");}
+  feedEntry={eventId:evt.id??null,item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",value:cls.value,uses:cls.uses.length,ambiguous:cls.ambiguous,ids:cls.ids,corpseRecovery};
+  if(liveEnabled&&!corpseRecovery){if(cls.value==="HIGH VALUE"&&s.soundHigh)beep("high");else if(s.soundAny)beep("research");}
  }else if(!isReplay){
   const researchLooking=/^words? of |^rune of |grimoire|compendium|memoir|writ|tome|signet|emblem|bolts|card of /i.test(evt.item);
-  feedEntry={eventId:evt.id??null,item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",value:researchLooking?"UNKNOWN":"OTHER",uses:0,ambiguous:false,ids:[]};
+  feedEntry={eventId:evt.id??null,item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",value:researchLooking?"UNKNOWN":"OTHER",uses:0,ambiguous:false,ids:[],corpseRecovery};
  }
 
  if(feedEntry){
@@ -752,7 +788,7 @@ function acceptLiveEventImmediately(evt){
  if(tracked){
   liveLootFeed.unshift({
    eventId:id,item:evt.item||"Unknown item",looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",
-   zone:evt.zone||currentZoneContext.zone||"",value:"CHECKING",uses:0,ambiguous:false,ids:[]
+   zone:evt.zone||currentZoneContext.zone||"",value:"CHECKING",uses:0,ambiguous:false,ids:[],corpseRecovery:!!evt.corpseRecovery||String(evt.lootSource||"").toLowerCase()==="corpse_recovery"
   });
   if(liveLootFeed.length>120)liveLootFeed.length=120;
  }
@@ -1091,6 +1127,7 @@ async function pollLiveMonitor(){
   $("#liveStatus").textContent=corpusSyncInProgress?"SYNCING":"ONLINE";
   $("#liveStatus").className="live-status online";
   const logName=sj.logFile||"EverQuest log";
+  liveLogCharacter=String(sj.character||"");
   if($("#liveLogName"))$("#liveLogName").textContent=logName;
   if($("#liveLogBadge"))$("#liveLogBadge").title=`Monitoring ${logName}${sj.character?` for ${sj.character}`:""}`;
   $("#liveMonitorMessage").textContent=`Watching ${logName}${sj.character?` for ${sj.character}`:""}. Loot tracking is active.`;
@@ -1418,13 +1455,36 @@ function normalizeMageloInput(v){
  const s=(v||"").trim(),m=s.match(/characters\.bastiongame\.com\/character\/([^/?#]+)/i);
  return (m?m[1]:s).replace(/[^A-Za-z0-9_-]/g,"").toLowerCase();
 }
+function mageloSlotEls(slot){
+ const primary=slot==="primary";
+ return {
+  input:$(primary?"#mageloPrimaryCharacter":"#mageloAdditionalCharacter"),
+  button:$(primary?"#refreshMageloPrimary":"#refreshMageloAdditional"),
+  clear:$(primary?"#clearMageloPrimary":"#clearMageloAdditional"),
+  status:$(primary?"#mageloPrimaryStatus":"#mageloAdditionalStatus")
+ };
+}
+function profileStorageSummary(profile){
+ const rows=profile?.inventory||[];
+ return {
+  carried:rows.filter(x=>x.location==="Inventory").reduce((n,x)=>n+Number(x.count||0),0),
+  banked:rows.filter(x=>x.location==="Bank").reduce((n,x)=>n+Number(x.count||0),0),
+  shared:rows.filter(x=>x.location==="Shared Bank").reduce((n,x)=>n+Number(x.count||0),0)
+ };
+}
+function renderMageloProfile(slot){
+ const profile=mageloProfiles[slot],els=mageloSlotEls(slot);if(!els.status)return;
+ if(!profile.meta){els.status.textContent=slot==="primary"?"No primary Magelo loaded.":"No additional Magelo loaded.";return}
+ const c=profile.meta.counts||{},d=profile.meta.diagnostics||{},summary=profileStorageSummary(profile);
+ const included=mageloProfileIncluded(slot);
+ els.status.innerHTML=`Loaded <strong>${esc(profile.meta.character)}</strong>${slot==="additional"?` • ${included?"included in":"excluded from"} Research readiness`:""}${profile.meta.bankHidden?`<div class="magelo-warning">Bank inventory is hidden because this character is Anonymous/Roleplay. This profile baseline is incomplete.</div>`:""}${(c.total||0)===0?`<div class="magelo-warning">The Magelo page loaded, but no inventory rows were recognized. Parser strategy: ${d.strategy||"unknown"}; payload found: ${d.payloadFound?"yes":"no"}.</div>`:""}<small>${summary.carried} carried • ${summary.banked} banked${summary.shared?` • ${summary.shared} shared`:""}</small>`;
+}
 function renderMagelo(){
- const badge=$("#mageloStatusBadge"),status=$("#mageloStatus"),stats=$("#mageloStats");if(!badge||!status||!stats)return;
- if(!mageloMeta){badge.textContent="NOT LOADED";badge.className="live-status offline";stats.innerHTML="";return}
- badge.textContent="LOADED";badge.className="live-status online";
- const c=mageloMeta.counts||{};
- const d=mageloMeta.diagnostics||{};
- status.innerHTML=`Loaded <strong>${esc(mageloMeta.character)}</strong> from Bastion Magelo${mageloMeta.bankHidden?`<div class="magelo-warning">Bank inventory is hidden because this character is Anonymous/Roleplay. The Magelo baseline is incomplete.</div>`:""}${(c.total||0)===0?`<div class="magelo-warning">The Magelo page loaded, but no inventory rows were recognized. Parser strategy: ${d.strategy||"unknown"}; payload found: ${d.payloadFound?"yes":"no"}.</div>`:""}`;
+ const badge=$("#mageloStatusBadge"),stats=$("#mageloStats");if(!badge||!stats)return;
+ renderMageloProfile("primary");renderMageloProfile("additional");
+ const loaded=[mageloProfiles.primary,mageloProfiles.additional].filter(p=>p.meta).length;
+ badge.textContent=loaded?`${loaded} PROFILE${loaded===1?"":"S"}`:"NOT LOADED";badge.className=`live-status ${loaded?"online":"offline"}`;
+ if(!loaded){stats.innerHTML="";return}
  const researchOwned=mageloInventory.map(x=>({item:x,uses:reverseUsesForItem(x)})).filter(x=>x.uses.length>0);
  const researchDistinct=researchOwned.length;
  const researchPieces=researchOwned.reduce((n,x)=>n+Number(x.item.count||0),0);
@@ -1434,39 +1494,59 @@ function renderMagelo(){
  const shared=mageloInventory.filter(x=>x.location==="Shared Bank").reduce((n,x)=>n+Number(x.count||0),0);
  const readyRecipes=recipeResults.filter(r=>r.missingCount===0).length;
  stats.innerHTML=`
-  <article class="inventory-insight primary"><span>Research pieces</span><strong>${researchPieces}</strong><small>${researchDistinct} distinct mapped components</small></article>
+  <article class="inventory-insight primary"><span>Research pieces</span><strong>${researchPieces}</strong><small>${researchDistinct} distinct mapped components across included profiles</small></article>
   <article class="inventory-insight"><span>High-value components</span><strong>${highValueDistinct}</strong><small>5+ verified Research uses</small></article>
-  <article class="inventory-insight"><span>Ready recipes</span><strong>${readyRecipes}</strong><small>Based on current inventory</small></article>
-  <article class="inventory-insight storage"><span>Where your items are</span><strong>${carried} carried • ${banked} banked${shared?` • ${shared} shared`:""}</strong><small>Player-friendly storage summary</small></article>`;
+  <article class="inventory-insight"><span>Ready recipes</span><strong>${readyRecipes}</strong><small>Based on included inventory</small></article>
+  <article class="inventory-insight storage"><span>Included storage</span><strong>${carried} carried • ${banked} banked${shared?` • ${shared} shared`:""}</strong><small>${treatSharedBankAsSame?"Shared Bank deduplicated across profiles":"Shared Bank counted separately per profile"}</small></article>`;
 }
-async function loadMagelo(value=null){
- if(!liveMonitorOnline){$("#mageloStatus").textContent="Start START-LIVE-MONITOR.bat first.";return}
- const input=normalizeMageloInput(value!==null&&value!==undefined?value:$("#mageloCharacter").value);if(!input){$("#mageloStatus").textContent="Enter a character name or Bastion Magelo URL.";return}
- $("#refreshMagelo").disabled=true;$("#refreshMagelo").textContent="Loading Magelo…";
+function saveMageloSettings(){
+ try{
+  const p=mageloProfiles.primary.meta?.character||mageloSlotEls("primary").input?.value||"";
+  const a=mageloProfiles.additional.meta?.character||mageloSlotEls("additional").input?.value||"";
+  localStorage.setItem("eqResearchMageloPrimary",p);
+  localStorage.setItem("eqResearchMageloAdditional",a);
+  localStorage.setItem("eqResearchIncludeAdditional",includeAdditionalMagelo?"1":"0");
+  localStorage.setItem("eqResearchSharedBankSame",treatSharedBankAsSame?"1":"0");
+  if(p)localStorage.setItem("eqResearchMageloCharacter",p);else localStorage.removeItem("eqResearchMageloCharacter");
+ }catch{}
+}
+async function loadMageloSlot(slot,value=null){
+ if(!liveMonitorOnline){const e=mageloSlotEls(slot);if(e.status)e.status.textContent="Start START-LIVE-MONITOR.bat first.";return}
+ const profile=mageloProfiles[slot],els=mageloSlotEls(slot);
+ const input=normalizeMageloInput(value!==null&&value!==undefined?value:els.input?.value);if(!input){if(els.status)els.status.textContent="Enter a character name or Bastion Magelo URL.";return}
+ if(els.button){els.button.disabled=true;els.button.textContent="Loading…"}
+ const oldMeta=profile.meta,oldInventory=profile.inventory,oldPlacements=profile.placements,oldCounts=profile.previousCounts;
  try{
   const r=await fetch(apiUrl(`/api/magelo?character=${encodeURIComponent(input)}`),{cache:"no-store"}),j=await r.json();
   if(!r.ok||!j.ok)throw Error(j.error||`HTTP ${r.status}`);
-  const nextMageloInventory=(j.data.items||[]).map(x=>({source:"Magelo",name:x.name,id:Number(x.id),count:Number(x.count||1),location:x.location,character:x.character}));
-  const nextMageloPlacements=(j.data.placements||[]).map(x=>({source:"Magelo",name:x.name,id:Number(x.id),count:Number(x.count||1),location:x.location,locationLabel:x.locationLabel||x.location,containerNumber:x.containerNumber,rawLocation:x.rawLocation,bagSlot:x.bagSlot,parentId:x.parentId,character:x.character}));
-  const nextCounts=mageloCountMap(nextMageloInventory);
-  const reconciled=reconcileOwnedLootWithMagelo(previousMageloCounts,nextCounts);
-  mageloMeta=j.data;mageloInventory=nextMageloInventory;mageloPlacements=nextMageloPlacements;previousMageloCounts=nextCounts;
-  $("#mageloCharacter").value=j.data.character;try{localStorage.setItem("eqResearchMageloCharacter",j.data.character)}catch{}
-  rebuildAggregated();render();
-  if(reconciled.length){
-   const n=reconciled.reduce((a,x)=>a+x.qty,0);
-   $("#mageloStatus").innerHTML+=`<div class="magelo-reconcile">Reconciled ${n} provisional live-loot item${n===1?"":"s"} now present in Magelo; no duplicate inventory was added.</div>`;
-  }
- }catch(e){$("#mageloStatus").textContent=`Magelo load failed: ${e.message}`;$("#mageloStatusBadge").textContent="ERROR";$("#mageloStatusBadge").className="live-status offline"}
- finally{$("#refreshMagelo").disabled=false;$("#refreshMagelo").textContent="Load / Refresh Magelo"}
+  const nextInventory=(j.data.items||[]).map(x=>({source:"Magelo",name:x.name,id:Number(x.id),count:Number(x.count||1),location:x.location,character:x.character||j.data.character}));
+  const nextPlacements=(j.data.placements||[]).map(x=>({source:"Magelo",name:x.name,id:Number(x.id),count:Number(x.count||1),location:x.location,locationLabel:x.locationLabel||x.location,containerNumber:x.containerNumber,rawLocation:x.rawLocation,bagSlot:x.bagSlot,parentId:x.parentId,character:x.character||j.data.character}));
+  const nextCounts=mageloCountMap(nextInventory);
+  let reconciled=[];
+  if(liveLogCharacter&&normalizeMageloInput(j.data.character)===normalizeMageloInput(liveLogCharacter))reconciled=reconcileOwnedLootWithMagelo(oldCounts,nextCounts);
+  profile.meta=j.data;profile.inventory=nextInventory;profile.placements=nextPlacements;profile.previousCounts=nextCounts;
+  if(els.input)els.input.value=j.data.character;
+  saveMageloSettings();rebuildAggregated();render();
+  if(reconciled.length&&els.status){const n=reconciled.reduce((a,x)=>a+x.qty,0);els.status.innerHTML+=`<div class="magelo-reconcile">Reconciled ${n} provisional live-loot item${n===1?"":"s"} for active log character ${esc(liveLogCharacter)}.</div>`}
+ }catch(e){
+  profile.meta=oldMeta;profile.inventory=oldInventory;profile.placements=oldPlacements;profile.previousCounts=oldCounts;
+  rebuildAggregated();render();if(els.status)els.status.innerHTML=`<div class="magelo-warning">Refresh failed: ${esc(e.message)}. The previously loaded ${slot} profile was preserved.</div>`;
+ }finally{if(els.button){els.button.disabled=false;els.button.textContent="Load / Refresh"}}
 }
 async function restoreMagelo(){
- let saved="";try{saved=localStorage.getItem("eqResearchMageloCharacter")||""}catch{}
- if(saved){$("#mageloCharacter").value=saved;await loadMagelo(saved)}
+ let primary="",additional="";
+ try{
+  primary=localStorage.getItem("eqResearchMageloPrimary")||localStorage.getItem("eqResearchMageloCharacter")||"";
+  additional=localStorage.getItem("eqResearchMageloAdditional")||"";
+  const inc=localStorage.getItem("eqResearchIncludeAdditional");if(inc!==null)includeAdditionalMagelo=inc!=="0";
+  const shared=localStorage.getItem("eqResearchSharedBankSame");if(shared!==null)treatSharedBankAsSame=shared!=="0";
+ }catch{}
+ const incEl=$("#includeAdditionalMagelo"),sharedEl=$("#treatSharedBankSame");if(incEl)incEl.checked=includeAdditionalMagelo;if(sharedEl)sharedEl.checked=treatSharedBankAsSame;
+ if(primary){const e=mageloSlotEls("primary");if(e.input)e.input.value=primary;await loadMageloSlot("primary",primary)}
+ if(additional){const e=mageloSlotEls("additional");if(e.input)e.input.value=additional;await loadMageloSlot("additional",additional)}
 }
-function clearMagelo(){
- mageloInventory=[];mageloPlacements=[];mageloMeta=null;previousMageloCounts=null;try{localStorage.removeItem("eqResearchMageloCharacter")}catch{}
- $("#mageloCharacter").value="";rebuildAggregated();render();
+function clearMageloSlot(slot){
+ const p=mageloProfiles[slot],els=mageloSlotEls(slot);p.meta=null;p.inventory=[];p.placements=[];p.previousCounts=null;if(els.input)els.input.value="";saveMageloSettings();rebuildAggregated();render();
 }
 function renderChars(){const el=$("#characterChips");if(!el)return;el.innerHTML=inventorySources.map(s=>`<div class="character-chip"><strong>${esc(s.character)}</strong><span>${s.rows} rows</span></div>`).join("")}
 function renderEvidence(){const el=$("#evidenceQueue");if(!el)return;const ev=ACTIVE_DATA.ownedComponentEvidence||{};if(ACTIVE_DATA!==BASTION_DATA||!aggregated.length){el.innerHTML='<p class="muted">Load Magelo or an inventory file with Bastion rules enabled.</p>';return}const cards=[];for(const[id,x]of Object.entries(ev)){const owned=aggregated.find(a=>a.id===Number(id));if(owned)cards.push({id,x,owned})}el.innerHTML=cards.length?cards.map(o=>`<div><strong>${esc(o.x.name)} #${o.id}</strong> — ${o.owned.count} on hand<br><small>${(o.x.researchUses||[]).join(", ")}</small></div>`).join("<hr>"):'<p class="muted">No matching evidence rows.</p>'}
@@ -1500,12 +1580,17 @@ attachAutocomplete($("#quickLootSearch"),itemSuggestionEntries,()=>{},runQuickLo
 attachAutocomplete($("#reverseSearch"),itemSuggestionEntries,immediate=>immediate?renderReverseLookup():scheduleReverseLookup(),renderReverseLookup);
 attachAutocomplete($("#spellSearch"),spellSuggestionEntries,immediate=>{if(immediate){renderSummary();renderList()}else scheduleSpellSearchRender()},()=>{renderSummary();renderList()});
 
-$("#refreshMagelo")?.addEventListener("click",()=>{$("#mageloStatus").textContent="Contacting Bastion Magelo…";loadMagelo()});
+$("#refreshMageloPrimary")?.addEventListener("click",()=>loadMageloSlot("primary"));
+$("#refreshMageloAdditional")?.addEventListener("click",()=>loadMageloSlot("additional"));
 $("#inventoryFileInstead")?.addEventListener("click",()=>$("#inventoryFiles")?.click());
 $("#inventoryFiles")?.addEventListener("change",e=>{if(e.target.files&&e.target.files.length)loadFiles([...e.target.files])});
 
-$("#mageloCharacter")?.addEventListener("keydown",e=>{if(e.key==="Enter")loadMagelo()});
-$("#clearMagelo")?.addEventListener("click",clearMagelo);
+$("#mageloPrimaryCharacter")?.addEventListener("keydown",e=>{if(e.key==="Enter")loadMageloSlot("primary")});
+$("#mageloAdditionalCharacter")?.addEventListener("keydown",e=>{if(e.key==="Enter")loadMageloSlot("additional")});
+$("#clearMageloPrimary")?.addEventListener("click",()=>clearMageloSlot("primary"));
+$("#clearMageloAdditional")?.addEventListener("click",()=>clearMageloSlot("additional"));
+$("#includeAdditionalMagelo")?.addEventListener("change",e=>{includeAdditionalMagelo=!!e.target.checked;saveMageloSettings();rebuildAggregated();render()});
+$("#treatSharedBankSame")?.addEventListener("change",e=>{treatSharedBankAsSame=!!e.target.checked;saveMageloSettings();rebuildAggregated();render()});
 
 const UPDATE_API="https://api.github.com/repos/jmdeland/eq-spell-research-assistant/releases/latest";
 let latestUpdateInfo=null;

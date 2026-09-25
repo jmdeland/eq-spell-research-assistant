@@ -52,6 +52,64 @@ $currentZoneVersion=$null
 $currentZoneEnteredAt=$null
 $lastZoneEntryLogTime=$null
 $currentZoneIsGenericInstance=$false
+$corpseRecoveryPending=$false
+$corpseRecoveryActive=$false
+$corpseRecoveryActivatedAt=$null
+$corpseRecoveryLastLootAt=$null
+$corpseRecoveryFirstLootSeen=$false
+$corpseRecoveryStartWindowSeconds=120
+$corpseRecoveryIdleWindowSeconds=60
+$corpseRecoveryMaxWindowSeconds=600
+
+function Reset-CorpseRecoveryContext {
+    $script:corpseRecoveryPending=$false
+    $script:corpseRecoveryActive=$false
+    $script:corpseRecoveryActivatedAt=$null
+    $script:corpseRecoveryLastLootAt=$null
+    $script:corpseRecoveryFirstLootSeen=$false
+}
+function Update-CorpseRecoveryContextFromLine([string]$line){
+    if(-not $line){return}
+    $res=[regex]::Match($line,'^\[(?<time>[^\]]+)\]\s*You regain experience from resurrection\.')
+    if($res.Success){
+        $script:corpseRecoveryPending=$true
+        $script:corpseRecoveryActive=$false
+        $script:corpseRecoveryActivatedAt=$null
+        $script:corpseRecoveryLastLootAt=$null
+        $script:corpseRecoveryFirstLootSeen=$false
+        return
+    }
+    $zone=[regex]::Match($line,'^\[(?<time>[^\]]+)\]\s*You have entered (?<zone>.+?)\.\s*$')
+    if($zone.Success){
+        $t=Parse-EqLogTime $zone.Groups['time'].Value
+        if($script:corpseRecoveryPending){
+            $script:corpseRecoveryPending=$false
+            $script:corpseRecoveryActive=$true
+            $script:corpseRecoveryActivatedAt=$(if($t){$t}else{Get-Date})
+            $script:corpseRecoveryLastLootAt=$null
+            $script:corpseRecoveryFirstLootSeen=$false
+            return
+        }
+        if($script:corpseRecoveryActive){Reset-CorpseRecoveryContext}
+    }
+}
+function Get-CorpseRecoveryLootState([string]$timestamp){
+    if(-not $script:corpseRecoveryActive){return $false}
+    $t=Parse-EqLogTime $timestamp
+    if(-not $t){$t=Get-Date}
+    if($script:corpseRecoveryActivatedAt){
+        $age=($t-$script:corpseRecoveryActivatedAt).TotalSeconds
+        if($age -gt $script:corpseRecoveryMaxWindowSeconds){Reset-CorpseRecoveryContext;return $false}
+        if(-not $script:corpseRecoveryFirstLootSeen -and $age -gt $script:corpseRecoveryStartWindowSeconds){Reset-CorpseRecoveryContext;return $false}
+    }
+    if($script:corpseRecoveryFirstLootSeen -and $script:corpseRecoveryLastLootAt){
+        $idle=($t-$script:corpseRecoveryLastLootAt).TotalSeconds
+        if($idle -gt $script:corpseRecoveryIdleWindowSeconds){Reset-CorpseRecoveryContext;return $false}
+    }
+    $script:corpseRecoveryFirstLootSeen=$true
+    $script:corpseRecoveryLastLootAt=$t
+    return $true
+}
 
 function Test-GenericInstanceZoneName([string]$zone){
     if([string]::IsNullOrWhiteSpace($zone)){return $false}
@@ -110,7 +168,7 @@ function Initialize-ZoneFromTail {
             $sr=New-Object IO.StreamReader($fs)
             try{$text=$sr.ReadToEnd()}finally{$sr.Dispose()}
         }finally{$fs.Dispose()}
-        foreach($line in ($text -split "`r?`n")){Update-ZoneContextFromLine $line}
+        foreach($line in ($text -split "`r?`n")){Update-CorpseRecoveryContextFromLine $line;Update-ZoneContextFromLine $line}
     }catch{}
 }
 function Parse-LootLine([string]$line){
@@ -188,9 +246,15 @@ function Read-NewLoot {
     }else{$script:carry=""}
 
     foreach($line in $parts){
+        Update-CorpseRecoveryContextFromLine $line
         Update-ZoneContextFromLine $line
         $evt=Parse-LootLine $line
         if($evt){
+            $isCorpseRecovery=$false
+            if($evt.self){$isCorpseRecovery=Get-CorpseRecoveryLootState ([string]$evt.timestamp)}
+            $evt|Add-Member -NotePropertyName corpseRecovery -NotePropertyValue $isCorpseRecovery -Force
+            $evt|Add-Member -NotePropertyName lootSource -NotePropertyValue $(if($isCorpseRecovery){"corpse_recovery"}else{"observed"}) -Force
+            $evt|Add-Member -NotePropertyName excludeFromObservedHistory -NotePropertyValue $isCorpseRecovery -Force
             $evt|Add-Member -NotePropertyName id -NotePropertyValue $nextId -Force
             $evt|Add-Member -NotePropertyName detectedAt -NotePropertyValue ((Get-Date).ToString("o")) -Force
             [void]$events.Add($evt)
@@ -261,6 +325,10 @@ try{
                 currentZoneVersion=$currentZoneVersion
                 currentZoneEnteredAt=$currentZoneEnteredAt
                 observedLootHistoryEnabled=($cfg.observedLootHistoryEnabled -ne $false)
+                corpseRecoveryPending=[bool]$corpseRecoveryPending
+                corpseRecoveryActive=[bool]$corpseRecoveryActive
+                corpseRecoveryFirstLootSeen=[bool]$corpseRecoveryFirstLootSeen
+                corpseRecoveryLastLootAt=$(if($corpseRecoveryLastLootAt){$corpseRecoveryLastLootAt.ToString("o")}else{$null})
                 events=$selected
                 workerTime=(Get-Date).ToString("o")
             })

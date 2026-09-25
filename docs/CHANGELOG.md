@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.17.2
+
+### Two-Character Magelo
+- Adds a Primary Character Magelo profile that is always included in Research readiness.
+- Adds an optional Additional Character Magelo profile that can remain loaded while being included or excluded from Research readiness.
+- Preserves stack quantities and character-specific inventory/bank placement labels.
+- Deduplicates same-account Shared Bank storage by default.
+- Reconciles provisional Live Loot only against the Magelo profile matching the active EQ log character.
+
+### Session & Observed History Reliability
+- Fixes CORS preflight handling for the dedicated persistence worker on port 8766.
+- Restores current-session persistence, startup session recovery, and permanent Observed Loot History writes.
+- Keeps Live Event delivery isolated on port 8767.
+
+### Corpse Recovery Protection — Field Testing
+- Adds post-resurrection corpse-recovery classification for self-looted equipment/items.
+- Keeps recovery events visible for audit/session transparency while excluding them from zone-based Observed Loot History and Research ownership/readiness.
+- This protection is shipping in v0.17.2 while Bastion field validation continues; edge cases may be refined in a follow-up patch.
+
+## v0.17.2-demo.2
+
+- Fixes browser-to-persistence-worker CORS preflight handling on port 8766.
+- OPTIONS responses now include Access-Control-Allow-Origin, Access-Control-Allow-Methods, and Access-Control-Allow-Headers before returning HTTP 204.
+- Restores browser session-event POSTs to the persistence worker so current-session recovery data and Observed Loot History can be written again.
+- Preserves v0.17.2-demo.1 two-character Magelo support and corpse-recovery filtering.
+- No intended changes to Live Event Worker port 8767 or Magelo parsing/readiness behavior.
+
+# Changelog
+
 ## v0.17.0
 
 ### Zone Tracking & Observed Loot History
