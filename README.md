@@ -311,7 +311,7 @@ Updating is optional. Older installed versions do not expire just because a newe
 
 ![Item Lookup](docs/images/RALM4.jpg)
 
-## Settings
+## Export
 
 ![Settings](docs/images/RALM5.jpg)
 
