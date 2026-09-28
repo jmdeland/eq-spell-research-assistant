@@ -1,4 +1,4 @@
-param([string]$Root = $PSScriptRoot)
+﻿param([string]$Root = $PSScriptRoot)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -38,18 +38,18 @@ function Repair-DesktopShortcut {
             $sc.Save()
         }
 
-        $userDataRoot=Join-Path $env:LOCALAPPDATA 'EverQuest Research & Loot Tool'
+        $userDataRoot = if($env:EQRL_USER_DATA_ROOT){[IO.Path]::GetFullPath($env:EQRL_USER_DATA_ROOT)}else{Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"}
         if(-not(Test-Path -LiteralPath $userDataRoot)){New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null}
         Set-Content -LiteralPath (Join-Path $userDataRoot 'install-root.txt') -Value $root -Encoding UTF8
     } catch {}
 }
 
-Repair-DesktopShortcut
+if($env:EQRL_PORTABLE -ne "1"){Repair-DesktopShortcut}
 
 $monitorScript = Join-Path $root 'live-monitor.ps1'
 $iconPath = Join-Path $root 'EverQuestResearchLoot.ico'
 $toolUrl = 'http://127.0.0.1:8765/index.html'
-$userDataRoot = Join-Path $env:LOCALAPPDATA 'EverQuest Research & Loot Tool'
+$userDataRoot = if($env:EQRL_USER_DATA_ROOT){[IO.Path]::GetFullPath($env:EQRL_USER_DATA_ROOT)}else{Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"}
 if(-not (Test-Path -LiteralPath $userDataRoot)){New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null}
 $trayPidPath = Join-Path $userDataRoot 'tray.pid'
 $shutdownRequestPath = Join-Path $userDataRoot 'shutdown-for-update.request'
@@ -58,6 +58,7 @@ $mutex = New-Object Threading.Mutex($false,'Local\EverQuestResearchLootToolTray'
 $ownsMutex = $false
 $appVersionPath = Join-Path $root 'app-version.json'
 $expectedVersion = ''
+$desiredPortable=($env:EQRL_PORTABLE -eq "1")
 try {
     if(Test-Path -LiteralPath $appVersionPath){$expectedVersion=[string]((Get-Content -LiteralPath $appVersionPath -Raw | ConvertFrom-Json).version)}
 } catch {}
@@ -73,7 +74,9 @@ try {
         try{$existingStatus=$existing.Content | ConvertFrom-Json}catch{}
         $existingVersion=$(if($existingStatus -and $existingStatus.version){[string]$existingStatus.version}else{''})
         $existingLooksLikeUs=$existingStatus -and (($existingStatus.app -eq 'EverQuest Research & Loot Tool') -or $existingStatus.PSObject.Properties.Name -contains 'logFile')
-        if($existingLooksLikeUs -and $expectedVersion -and $existingVersion -eq $expectedVersion){
+        $existingPortable=$false
+        if($existingStatus -and $existingStatus.PSObject.Properties.Name -contains 'portableMode'){$existingPortable=($existingStatus.portableMode -eq $true)}
+        if($existingLooksLikeUs -and $expectedVersion -and $existingVersion -eq $expectedVersion -and $existingPortable -eq $desiredPortable){
             Start-Process $toolUrl
             exit 0
         }
@@ -96,7 +99,9 @@ try {
         try{$status=$r.Content | ConvertFrom-Json}catch{}
         $runningVersion=$(if($status -and $status.version){[string]$status.version}else{''})
         $looksLikeOurApp=$status -and (($status.app -eq 'EverQuest Research & Loot Tool') -or $status.PSObject.Properties.Name -contains 'logFile')
-        if($looksLikeOurApp -and $expectedVersion -and $runningVersion -eq $expectedVersion){
+        $runningPortable=$false
+        if($status -and $status.PSObject.Properties.Name -contains 'portableMode'){$runningPortable=($status.portableMode -eq $true)}
+        if($looksLikeOurApp -and $expectedVersion -and $runningVersion -eq $expectedVersion -and $runningPortable -eq $desiredPortable){
             $alreadyRunning=$true
         } elseif($looksLikeOurApp){
             $staleCompanion=$true

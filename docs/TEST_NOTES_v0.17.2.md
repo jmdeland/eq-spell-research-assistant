@@ -1,4 +1,4 @@
-# v0.17.2 Field Test Notes
+﻿# v0.17.2-demo.2 Field Test Notes
 
 This build is on the **demo** channel and is intended for Windows/Bastion field testing before stable promotion.
 
@@ -49,8 +49,3 @@ Keep the previous working ZIP. If this build misbehaves, exit the tray applicati
 - Confirm the current monthly `loot-history-YYYY-MM.jsonl` file gains a new line for normal (non-corpse-recovery) loot.
 - Confirm a restart offers the saved session when session data exists.
 - Confirm corpse-recovery loot remains excluded from permanent Observed Loot History.
-
-
-## Release note
-
-Corpse Recovery Protection is included in v0.17.2 but remains under active Bastion field testing.

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory=$true)][int]$ParentPid
 )
 
@@ -6,7 +6,7 @@ $ErrorActionPreference="SilentlyContinue"
 $root=Split-Path -Parent $MyInvocation.MyCommand.Path
 $configPath=Join-Path $root "monitor-config.json"
 $appVersionPath=Join-Path $root "app-version.json"
-$userDataRoot=Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"
+$userDataRoot = if($env:EQRL_USER_DATA_ROOT){[IO.Path]::GetFullPath($env:EQRL_USER_DATA_ROOT)}else{Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"}
 $sessionMetaPath=Join-Path $userDataRoot "session-meta.json"
 
 function Read-Config {
@@ -57,6 +57,7 @@ $corpseRecoveryActive=$false
 $corpseRecoveryActivatedAt=$null
 $corpseRecoveryLastLootAt=$null
 $corpseRecoveryFirstLootSeen=$false
+$corpseRecoveryDeathSeenAt=$null
 $corpseRecoveryStartWindowSeconds=120
 $corpseRecoveryIdleWindowSeconds=60
 $corpseRecoveryMaxWindowSeconds=600
@@ -67,9 +68,19 @@ function Reset-CorpseRecoveryContext {
     $script:corpseRecoveryActivatedAt=$null
     $script:corpseRecoveryLastLootAt=$null
     $script:corpseRecoveryFirstLootSeen=$false
+    $script:corpseRecoveryDeathSeenAt=$null
 }
 function Update-CorpseRecoveryContextFromLine([string]$line){
     if(-not $line){return}
+
+    $death=[regex]::Match($line,'^\[(?<time>[^\]]+)\]\s*You have been slain by .+!\s*$')
+    if($death.Success){
+        Reset-CorpseRecoveryContext
+        $dt=Parse-EqLogTime $death.Groups['time'].Value
+        $script:corpseRecoveryDeathSeenAt=$(if($dt){$dt}else{Get-Date})
+        return
+    }
+
     $res=[regex]::Match($line,'^\[(?<time>[^\]]+)\]\s*You regain experience from resurrection\.')
     if($res.Success){
         $script:corpseRecoveryPending=$true
@@ -79,6 +90,18 @@ function Update-CorpseRecoveryContextFromLine([string]$line){
         $script:corpseRecoveryFirstLootSeen=$false
         return
     }
+
+    $returning=[regex]::Match($line,'^\[(?<time>[^\]]+)\]\s*Returning to Resurrect, please wait\.\.\.\s*$')
+    if($returning.Success -and $script:corpseRecoveryPending){
+        $t=Parse-EqLogTime $returning.Groups['time'].Value
+        $script:corpseRecoveryPending=$false
+        $script:corpseRecoveryActive=$true
+        $script:corpseRecoveryActivatedAt=$(if($t){$t}else{Get-Date})
+        $script:corpseRecoveryLastLootAt=$null
+        $script:corpseRecoveryFirstLootSeen=$false
+        return
+    }
+
     $zone=[regex]::Match($line,'^\[(?<time>[^\]]+)\]\s*You have entered (?<zone>.+?)\.\s*$')
     if($zone.Success){
         $t=Parse-EqLogTime $zone.Groups['time'].Value
@@ -90,7 +113,14 @@ function Update-CorpseRecoveryContextFromLine([string]$line){
             $script:corpseRecoveryFirstLootSeen=$false
             return
         }
-        if($script:corpseRecoveryActive){Reset-CorpseRecoveryContext}
+        if($script:corpseRecoveryActive){
+            $sameRezTransition=$false
+            if(-not $script:corpseRecoveryFirstLootSeen -and $script:corpseRecoveryActivatedAt){
+                $zt=$(if($t){$t}else{Get-Date})
+                $sameRezTransition=(($zt-$script:corpseRecoveryActivatedAt).TotalSeconds -le 30)
+            }
+            if(-not $sameRezTransition){Reset-CorpseRecoveryContext}
+        }
     }
 }
 function Get-CorpseRecoveryLootState([string]$timestamp){
@@ -329,6 +359,7 @@ try{
                 corpseRecoveryActive=[bool]$corpseRecoveryActive
                 corpseRecoveryFirstLootSeen=[bool]$corpseRecoveryFirstLootSeen
                 corpseRecoveryLastLootAt=$(if($corpseRecoveryLastLootAt){$corpseRecoveryLastLootAt.ToString("o")}else{$null})
+                corpseRecoveryDeathSeenAt=$(if($corpseRecoveryDeathSeenAt){$corpseRecoveryDeathSeenAt.ToString("o")}else{$null})
                 events=$selected
                 workerTime=(Get-Date).ToString("o")
             })

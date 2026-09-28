@@ -1,23 +1,98 @@
 # Changelog
 
-## v0.17.2
+## v0.17.3
 
-### Two-Character Magelo
-- Adds a Primary Character Magelo profile that is always included in Research readiness.
-- Adds an optional Additional Character Magelo profile that can remain loaded while being included or excluded from Research readiness.
-- Preserves stack quantities and character-specific inventory/bank placement labels.
-- Deduplicates same-account Shared Bank storage by default.
-- Reconciles provisional Live Loot only against the Magelo profile matching the active EQ log character.
+### Easy Start / Portable Mode
+- Adds `START HERE.bat` as the recommended first-run entry point.
+- Supports persistent Portable Mode with data stored under `portable-data\`.
+- Keeps Desktop Mode available through the same Easy Start flow.
+- Adds a setup checker for core files, saved EQ log, and local workers.
 
-### Session & Observed History Reliability
-- Fixes CORS preflight handling for the dedicated persistence worker on port 8766.
-- Restores current-session persistence, startup session recovery, and permanent Observed Loot History writes.
-- Keeps Live Event delivery isolated on port 8767.
+### Safe Data Migration
+- Supports Portable -> Desktop and Desktop -> Portable onboarding.
+- Creates backups before replacing existing destination data.
+- Merges monthly Observed Loot History archives instead of overwriting them.
+- Deduplicates history using `historyId`, with exact-line fallback for older records.
+- Leaves source data intact after migration.
 
-### Corpse Recovery Protection — Field Testing
-- Adds post-resurrection corpse-recovery classification for self-looted equipment/items.
-- Keeps recovery events visible for audit/session transparency while excluding them from zone-based Observed Loot History and Research ownership/readiness.
-- This protection is shipping in v0.17.2 while Bastion field validation continues; edge cases may be refined in a follow-up patch.
+### EverQuest Log Detection
+- Scans likely EverQuest installs and strongly prefers the log actively written within the last 10 minutes.
+- Prevents stale older Bastion installations from silently becoming the monitored client.
+- Uses the normal Windows picker when selection is ambiguous.
+
+### Loot / Recovery Improvements
+- Adds persistent player loot-value overrides: Default, High Value, Keep, and Not Valuable.
+- Improves in-zone corpse-recovery detection for Bastion resurrection sequences containing `Returning to Resurrect, please wait...` without a new zone-entry line.
+- Keeps verified Research usefulness separate from player value classification.
+
+### Retained Architecture
+- Preserves two-character Magelo, Shared Bank deduplication, session persistence, permanent Observed Loot History, port 8767 Live Event Worker, port 8766 persistence worker, and the separate history-index worker.
+
+## v0.17.2-demo.8
+
+- Adds safe Desktop -> Portable onboarding import from `START HERE.bat`.
+- Desktop data remains untouched; existing portable data is backed up before import.
+- Observed Loot History is merged/deduplicated rather than overwritten.
+- Fixes first-run EQ log selection to strongly prefer the single log actively written within the last 10 minutes.
+- Prevents a stale older Bastion installation log from being silently preferred over the active client.
+- Keeps the normal Windows picker for ambiguous cases, preselecting the newest candidate.
+- No intended changes to loot parsing, Magelo, research logic, sessions, persistence, or corpse-recovery rules.
+
+## v0.17.2-demo.8
+
+### Easier First-Run Experience
+- Adds `START HERE.bat` as the single obvious entry point.
+- Easy Start offers Portable Mode, Desktop Mode, Check / Repair Setup, or Exit.
+- Detects existing portable and Desktop-mode data and explains the choices in plain language.
+- Desktop Mode keeps the safe backup + history merge behavior from demo.6 and launches the app after setup.
+- Adds a basic setup checker for core files, EverQuest log, main service, Live Loot worker, and persistence worker.
+- Adds conservative automatic EverQuest log detection in common Sony EverQuest folders across C:-G:.
+- Exactly one log active within the last 24 hours is selected automatically; otherwise the normal file picker opens with the most likely log preselected.
+- Simplifies README-FIRST around one action: double-click `START HERE.bat`.
+- No intended change to loot parsing, Magelo, recipes, value overrides, corpse recovery, session persistence, or Observed History behavior.
+
+## v0.17.2-demo.8
+
+### Safe Portable-to-Desktop Data Migration
+- Creates a full timestamped backup of existing Desktop-mode data before importing portable data.
+- Merges monthly Observed Loot History archives instead of overwriting them.
+- Deduplicates history by `historyId`; records without a history ID are preserved unless their raw JSONL line is an exact duplicate.
+- Reports Desktop records, Portable records, duplicates skipped, merged records, and archive count.
+- Deletes only the derived history index/state after merge so the history worker rebuilds from authoritative raw monthly archives.
+- Leaves the original `portable-data` folder untouched.
+- Continues to verify copied non-history files.
+- Excludes process-coordination files and derived history-index files from migration.
+- Retains demo.5 visible migration prompting, demo.4 portable runtime, demo.3 corpse-recovery rules and loot-value overrides, two-character Magelo, persistence fixes, and Live Loot architecture.
+
+## v0.17.2-demo.5
+
+### Portable-to-Desktop Migration Reliability
+- Replaces the easy-to-miss background migration MessageBox with an explicit foreground console prompt.
+- Clearly reports the detected portable-data folder and number of portable user-data files.
+- Supports a deliberate Y/N choice before any migration occurs.
+- Copies portable settings, Magelo/browser state, session recovery, and Observed Loot History into Desktop mode.
+- Leaves the original `portable-data` folder untouched as a backup.
+- Excludes transient process-coordination files such as `tray.pid` from migration.
+- Verifies every copied file exists at the Desktop-mode destination and matches the source file size before reporting success.
+- Clearly reports when the user declines migration.
+- Keeps the existing desktop shortcut creation behavior after the migration decision.
+- Retains the demo.4 portable runtime, demo.3 corpse-recovery fix, loot-value overrides, two-character Magelo, persistence fixes, and Live Loot architecture.
+
+## v0.17.2-demo.3
+
+### Corpse Recovery — In-Zone Resurrection Fix
+- Fixes corpse-recovery detection when Bastion resurrects the player in place and does not emit a new `You have entered <zone>` line.
+- Recognizes `Returning to Resurrect, please wait...` as a valid recovery activation after resurrection experience is restored.
+- Tracks the player's `You have been slain by ...` line as supporting death context.
+- Preserves recovery across an immediate post-rez zone-entry line when a client emits both transition styles.
+- Keeps recovered corpse items visible in the current session while excluding them from provisional ownership, Research readiness, alerts, and permanent Observed Loot History.
+
+### Player Loot Value Overrides
+- Adds a persistent per-item Player Value override: Use Default, High Value, Keep, or Not Valuable.
+- Overrides change player-facing value labels and value alerts without altering verified Research recipe data.
+- `Not Valuable` suppresses high-value/Research attention sounds while preserving any verified Research uses.
+- Adds a Manage Loot Value Overrides section in Settings with per-item reset and Clear All.
+- Overrides are stored locally in the browser and survive application restarts.
 
 ## v0.17.2-demo.2
 
@@ -28,6 +103,51 @@
 - No intended changes to Live Event Worker port 8767 or Magelo parsing/readiness behavior.
 
 # Changelog
+
+## v0.17.2-demo.5
+
+### Portable / No-Install Mode
+- Adds `RUN-PORTABLE.bat` and a hidden portable launcher.
+- Portable runtime data is stored under `portable-data\` inside the extracted application folder.
+- Main companion, persistence worker, Live Event Worker, and history index worker all use the selected portable data root.
+- Adds file-backed browser preference synchronization for Magelo profile names, loot-value overrides, Live Loot settings, and appearance.
+- Desktop shortcut setup detects portable data and offers to copy it into `%LOCALAPPDATA%` while retaining the portable copy as a backup.
+- Built-in updater safeguards portable data during replacement and restarts back into portable mode.
+
+### Retained Demo Fixes
+- Retains v0.17.2-demo.3 in-zone resurrection/corpse-recovery handling.
+- Retains manual Default / High Value / Keep / Not Valuable loot-value overrides.
+- Retains two-character Magelo, Shared Bank deduplication, session persistence, and Observed Loot History fixes.
+
+
+## v0.17.2
+
+### Two-Character Magelo
+- Adds a Primary Character Magelo profile that is always included in Research readiness.
+- Adds an optional Additional Character Magelo profile that can be loaded/retained while being included or excluded from Research readiness.
+- Automatically migrates the older single-profile Magelo setting into the Primary Character slot.
+- Stores and restores both profile names locally.
+- Clearing or failing to refresh one profile does not wipe the other profile.
+- Ingredient location labels include character ownership, such as `Bromm — Inventory Bag 6`.
+- Adds **Treat Shared Bank as the same shared storage for both profiles**, ON by default, so the same account-level Shared Bank is not double-counted.
+- Shared Bank placements are displayed as shared storage rather than falsely belonging to both characters.
+- Live provisional loot reconciliation occurs only when the refreshed Magelo profile matches the character in the currently monitored EQ log.
+- Magelo remains explicit-load/refresh only and does not add work to the port 8767 Live Event Worker.
+
+### Corpse Recovery Protection
+- Detects `You regain experience from resurrection.` and arms protection for the first post-resurrection self-loot sequence after zoning back.
+- First recovery loot must begin within 120 seconds; the sequence remains active while self-loot continues within 60 seconds, with a 10-minute hard maximum.
+- Another zone transition ends an unfinished recovery window.
+- Marks recovered items as `corpse_recovery` and shows **CORPSE RECOVERY — not counted as a new drop** in Live Loot.
+- Keeps recovered events in the recoverable session/CSV for transparency.
+- Corpse recovery does not increase Session Loot totals, provisional owned counts, Research readiness, craftable alerts, or Research loot sounds.
+- Corpse-recovery items are excluded from permanent Observed Loot History so recovered gear is never learned as a drop from the recovery zone.
+- Detection exists in both the dedicated Live Event Worker and main companion fallback path.
+
+### Test / Revert Safety
+- Built from the supplied v0.17.0 production ZIP baseline.
+- App channel remains `demo` while the combined v0.17.2 behavior is field-tested.
+- Existing v0.17.0 architecture, updater/session protections, zone tracking, history storage, and Research UI remain otherwise unchanged.
 
 ## v0.17.0
 

@@ -1,9 +1,9 @@
-param(
+﻿param(
     [Parameter(Mandatory=$true)][int]$ParentPid
 )
 
 $ErrorActionPreference="SilentlyContinue"
-$userDataRoot=Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"
+$userDataRoot = if($env:EQRL_USER_DATA_ROOT){[IO.Path]::GetFullPath($env:EQRL_USER_DATA_ROOT)}else{Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"}
 $historyRoot=Join-Path $userDataRoot "history"
 $indexPath=Join-Path $historyRoot "loot-history-index.json"
 $statePath=Join-Path $historyRoot "history-index-worker-state.json"

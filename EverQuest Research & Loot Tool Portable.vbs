@@ -1,0 +1,12 @@
+Option Explicit
+Dim shell, fso, root, ps, cmd, env
+Set shell = CreateObject("WScript.Shell")
+Set fso = CreateObject("Scripting.FileSystemObject")
+root = fso.GetParentFolderName(WScript.ScriptFullName)
+Set env = shell.Environment("PROCESS")
+env("EQRL_PORTABLE") = "1"
+env("EQRL_USER_DATA_ROOT") = fso.BuildPath(root, "portable-data")
+ps = fso.BuildPath(root, "research-tool-tray.ps1")
+shell.CurrentDirectory = shell.ExpandEnvironmentStrings("%TEMP%")
+cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File """ & ps & """ -Root """ & root & """"
+shell.Run cmd, 0, False

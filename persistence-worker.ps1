@@ -5,7 +5,7 @@
 $ErrorActionPreference="Stop"
 $root=Split-Path -Parent $MyInvocation.MyCommand.Path
 $configPath=Join-Path $root "monitor-config.json"
-$userDataRoot=Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"
+$userDataRoot = if($env:EQRL_USER_DATA_ROOT){[IO.Path]::GetFullPath($env:EQRL_USER_DATA_ROOT)}else{Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"}
 if(-not(Test-Path -LiteralPath $userDataRoot)){New-Item -ItemType Directory -Path $userDataRoot -Force|Out-Null}
 $sessionStatePath=Join-Path $userDataRoot "session-loot.jsonl"
 $sessionMetaPath=Join-Path $userDataRoot "session-meta.json"

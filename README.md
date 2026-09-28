@@ -1,10 +1,12 @@
-# EverQuest Research & Loot Tool by Bromm
+# What's New in v0.17.3
 
-A local Windows companion for the **Bastion EverQuest server** that combines live loot monitoring, spell Research planning, Bastion Magelo inventory mapping, item lookup, session tracking, and safe self-updating.
-
-**Current stable release: v0.17.2**
-
-> Built for EverQuest players who want to know, in real time, whether a drop matters for Research — and whether they already have what they need to make a spell.
+- Adds **START HERE.bat** as the single easy entry point for Portable Mode, Desktop Mode, and setup checking.
+- Adds **Portable Mode** with persistent local data and no traditional installation requirement.
+- Adds safe **Portable ↔ Desktop** data migration with backups and Observed Loot History merging instead of overwrite.
+- Improves first-run EverQuest log detection so the actively written client log is preferred over stale installs.
+- Adds persistent player loot-value overrides: Default, High Value, Keep, and Not Valuable.
+- Improves Bastion corpse-recovery detection for in-zone resurrection sequences that do not emit a new zone-entry line.
+- Preserves two-character Magelo, Shared Bank deduplication, session recovery, permanent Observed Loot History, and the dedicated worker architecture.
 
 ---
 
@@ -16,7 +18,7 @@ https://github.com/jmdeland/eq-spell-research-assistant/releases/latest
 **Repository:**  
 https://github.com/jmdeland/eq-spell-research-assistant
 
-Download the ZIP from the latest GitHub Release, extract it to a permanent folder, run the desktop shortcut installer once, and launch the tool from the desktop icon.
+Download the ZIP from the latest GitHub Release, extract it to a permanent folder, and double-click `START HERE.bat`. Choose Portable Mode or Desktop Mode from the guided menu.
 
 ---
 
@@ -311,7 +313,7 @@ Updating is optional. Older installed versions do not expire just because a newe
 
 ![Item Lookup](docs/images/RALM4.jpg)
 
-## Export
+## Settings
 
 ![Settings](docs/images/RALM5.jpg)
 
@@ -323,6 +325,22 @@ Updating is optional. Older installed versions do not expire just because a newe
 
 # Installation
 
+
+## Portable Mode — No Installation Required
+
+For users who want to try the tool without setting up a desktop shortcut, v0.17.2-demo.5 adds a true portable launch option.
+
+1. Download and extract the ZIP.
+2. Double-click `RUN-PORTABLE.bat`.
+3. Use the tool normally.
+
+Portable mode creates no Windows service and no registry entry. Portable runtime data is stored under `portable-data\` inside the extracted application folder. This includes session recovery, Observed Loot History, file-backed browser preferences, Magelo profile names, and loot-value overrides.
+
+If the user later runs `INSTALL-DESKTOP-SHORTCUT.bat`, the setup detects portable data and offers to copy it into the normal `%LOCALAPPDATA%\EverQuest Research & Loot Tool\` location. The portable copy is retained as a backup.
+
+The built-in updater preserves `portable-data\` during portable-mode updates.
+
+---
 ## Recommended installation
 
 1. Open the latest GitHub Release.
@@ -420,30 +438,15 @@ Stable releases are published through GitHub Releases.
 
 
 
-# What's New in v0.17.2
+# What's New in v0.17.3
 
-## Two-Character Magelo
-
-- Adds a **Primary Character** Magelo profile that is always included in Research readiness.
-- Adds an optional **Additional Character** profile that can be loaded independently and included or excluded from Research readiness without unloading it.
-- Preserves exact item IDs, stack quantities, character ownership, and player-friendly inventory/bank locations.
-- Adds Shared Bank deduplication so same-account shared storage is not counted twice when both profiles expose it.
-- Live provisional loot reconciles only against the Magelo profile matching the currently monitored EQ log character.
-
-## Session & Observed History Reliability
-
-- Fixes browser-to-persistence-worker CORS preflight handling on port 8766.
-- Restores current-session persistence and startup recovery data.
-- Restores permanent Observed Loot History writes while keeping persistence isolated from Live Loot delivery.
-
-## Corpse Recovery Protection — Still Under Field Testing
-
-- Adds detection for the post-resurrection self-loot sequence used when recovering equipment from your corpse.
-- Classified corpse-recovery items remain visible in Live Loot/session records for transparency.
-- Corpse-recovery items are excluded from permanent zone-based Observed Loot History and do not affect provisional Research ownership/readiness.
-- **This mechanic is included in v0.17.2 but is still being field-tested on Bastion.** If an edge case is found, it will be corrected in a follow-up release.
-
----
+- One-file `START HERE.bat` onboarding for Portable or Desktop use.
+- Persistent Portable Mode plus safe two-way migration between Portable and Desktop data.
+- Backups and merge-safe Observed Loot History migration.
+- Active-client log selection that prefers recently written EQ logs.
+- Player-controlled loot-value overrides.
+- Improved in-zone corpse-recovery detection.
+- Existing Live Loot, Magelo, Research, session, history, and worker architecture retained.
 
 # Project
 
@@ -454,3 +457,21 @@ https://github.com/jmdeland/eq-spell-research-assistant
 
 Latest stable release:  
 https://github.com/jmdeland/eq-spell-research-assistant/releases/latest
+
+
+# v0.17.3
+
+## Portable, Onboarding, and Migration Improvements
+
+This demo hardens the portable-to-desktop transition. Before importing portable data, the desktop setup now creates a timestamped backup of existing Desktop data. Monthly Observed Loot History JSONL archives are merged by unique `historyId` instead of replaced, the derived history index is rebuilt from raw archives, and the portable source remains untouched. The installer reports record counts and duplicates so the migration is auditable.
+
+
+# v0.17.2-demo.5
+
+- Adds `RUN-PORTABLE.bat` for no-installation-required use.
+- Stores portable session/history/runtime data under `portable-data\`.
+- Adds file-backed browser preference portability for Magelo profile names, loot-value overrides, Live Loot settings, and appearance.
+- Desktop shortcut setup detects portable data and offers to copy it into Desktop mode without deleting the portable copy.
+- Built-in updates preserve portable data and restart back into portable mode.
+- Retains the v0.17.2-demo.3 in-zone corpse-recovery fix and manual loot-value overrides.
+- Retains two-character Magelo, session persistence, Observed Loot History, and dedicated Live Loot worker architecture.

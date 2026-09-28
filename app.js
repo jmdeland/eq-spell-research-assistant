@@ -13,6 +13,36 @@ function apiUrl(path){
  return onCompanion?path:`${LIVE_COMPANION_ORIGIN}${path}`;
 }
 
+const PORTABLE_BROWSER_STATE_KEYS=[
+ "eqResearchLootValueOverridesV1","eqResearchLiveSettings","eqResearchMageloPrimary","eqResearchMageloAdditional",
+ "eqResearchIncludeAdditional","eqResearchSharedBankSame","eqResearchMageloCharacter","eqResearchSkinV2"
+];
+let browserStateSyncTimer=null;
+async function hydrateBrowserStateFromCompanion(){
+ try{
+  const r=await fetch(apiUrl("/api/browser-state"),{cache:"no-store"});if(!r.ok)return false;
+  const j=await r.json(),state=j?.state;if(!state||typeof state!=="object")return false;
+  let changed=false;
+  for(const key of PORTABLE_BROWSER_STATE_KEYS){
+   if(Object.prototype.hasOwnProperty.call(state,key)&&state[key]!=null&&localStorage.getItem(key)!==String(state[key])){
+    localStorage.setItem(key,String(state[key]));changed=true;
+   }
+  }
+  return changed;
+ }catch{return false}
+}
+async function persistBrowserStateToCompanion(){
+ try{
+  const state={};for(const key of PORTABLE_BROWSER_STATE_KEYS){const v=localStorage.getItem(key);if(v!==null)state[key]=v}
+  await fetch(apiUrl("/api/browser-state"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({state}),cache:"no-store"});
+ }catch{}
+}
+function startBrowserStatePersistence(){
+ if(browserStateSyncTimer)clearInterval(browserStateSyncTimer);
+ browserStateSyncTimer=setInterval(persistBrowserStateToCompanion,2000);
+ window.addEventListener("beforeunload",()=>{persistBrowserStateToCompanion()});
+}
+
 let ACTIVE_DATA=BASTION_DATA,inventory=[],aggregated=[],inventorySources=[],mageloInventory=[],mageloPlacements=[],mageloMeta=null,recipeResults=[],selectedKey=null,liveLootCounts=new Map(),liveOwnedCounts=new Map(),sessionLootEvents=[],previousMageloCounts=null,liveLootFeed=[],liveLastEventId=0,liveEnabled=true,liveAudioCtx=null,liveMonitorOnline=false,corpusSyncInProgress=false,livePollInFlight=false,liveSessionEpoch=0,sessionResetInProgress=false,liveSessionId=null,processedLiveEventIds=new Set(),pendingLiveEventIds=new Set(),pendingLiveEvents=[],pendingLiveProcessTimer=null,liveClassificationCache=new Map(),observedLootHistory=[],lootHistoryLoaded=false,historySummaryLoaded=false,historySummaryInFlight=false,historySummaryLastFetch=0,observedHistoryEnabled=true,historyQueryTimer=null,currentZoneContext={zone:"",zoneId:null,instanceId:null,zoneVersion:null,enteredAt:null},sessionRecoveryPending=true,sessionRecoveryChecked=false,autoUpdateCheckStarted=false,liveLogCharacter="",includeAdditionalMagelo=true,treatSharedBankAsSame=true;
 const mageloProfiles={
  primary:{slot:"primary",meta:null,inventory:[],placements:[],previousCounts:null},
@@ -21,6 +51,38 @@ const mageloProfiles={
 const $=s=>document.querySelector(s),norm=s=>(s||"").toLowerCase().replace(/[’']/g,"`").replace(/\s+/g," ").trim();
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 function canonical(s){let n=norm(s);if(n.startsWith("spell: "))n=n.slice(7);return(ACTIVE_DATA.aliases||{})[n]||n}
+const LOOT_VALUE_OVERRIDE_KEY="eqResearchLootValueOverridesV1";
+let lootValueOverrides={};
+function normalizeLootValueOverride(v){
+ const x=String(v||"").toUpperCase().replace(/_/g," ").trim();
+ return ["HIGH VALUE","KEEP","NOT VALUABLE"].includes(x)?x:"";
+}
+function loadLootValueOverrides(){
+ try{
+  const raw=JSON.parse(localStorage.getItem(LOOT_VALUE_OVERRIDE_KEY)||"{}");
+  lootValueOverrides=raw&&typeof raw==="object"&&!Array.isArray(raw)?raw:{};
+ }catch{lootValueOverrides={}}
+}
+function saveLootValueOverrides(){try{localStorage.setItem(LOOT_VALUE_OVERRIDE_KEY,JSON.stringify(lootValueOverrides))}catch{}}
+function getLootValueOverride(name){
+ const raw=lootValueOverrides[canonical(name)];
+ if(raw&&typeof raw==="object")return normalizeLootValueOverride(raw.value);
+ return normalizeLootValueOverride(raw);
+}
+function displayedLootValue(name,autoValue){return getLootValueOverride(name)||autoValue}
+function setLootValueOverride(name,value){
+ const key=canonical(name),normalized=normalizeLootValueOverride(value);if(!key)return;
+ if(normalized)lootValueOverrides[key]={value:normalized,name:String(name||"").trim()||key};else delete lootValueOverrides[key];
+ saveLootValueOverrides();liveClassificationCache.clear();
+ for(const row of liveLootFeed){if(canonical(row.item)!==key)continue;const cls=classifyLoot(row.item);row.value=cls.value;row.playerValueOverride=cls.playerValueOverride||""}
+ renderLiveFeed();renderLootValueOverrideManager();
+}
+function renderLootValueOverrideManager(){
+ const el=$("#lootValueOverrideList");if(!el)return;
+ const rows=Object.entries(lootValueOverrides).map(([key,raw])=>{const obj=raw&&typeof raw==="object"?raw:{value:raw,name:key};return{key,name:obj.name||key,value:normalizeLootValueOverride(obj.value)}}).filter(x=>x.value).sort((a,b)=>a.name.localeCompare(b.name));
+ if(!rows.length){el.innerHTML='<p class="muted">No custom loot-value overrides saved.</p>';return}
+ el.innerHTML=rows.map(x=>`<div class="loot-override-row"><span><strong>${esc(x.name)}</strong><small>${esc(x.value)}</small></span><button class="ghost" type="button" data-clear-loot-override="${esc(x.key)}">Use Default</button></div>`).join("");
+}
 function catalogSpell(name){
  return (SPELL_CATALOG.spells||[]).find(s=>norm(s.name)===norm(name))||null;
 }
@@ -475,35 +537,36 @@ function useMatchesSelectedClass(u){
 }
 function classifyLoot(name){
  const settings=liveSettings(),selectedClass=$("#classFilter")?.value||"ALL";
- const cacheKey=`${canonical(name)}|${settings.classOnly?selectedClass:"ALL"}|${settings.threshold}`;
- const cached=liveClassificationCache.get(cacheKey);
- if(cached)return cached;
+ const playerValueOverride=getLootValueOverride(name);
+ const cacheKey=`${canonical(name)}|${settings.classOnly?selectedClass:"ALL"}|${settings.threshold}|${playerValueOverride||"DEFAULT"}`;
+ const cached=liveClassificationCache.get(cacheKey);if(cached)return cached;
  const lookup=researchUsesForLootName(name),uses=lookup.uses.filter(useMatchesSelectedClass);
  const spellUses=uses.filter(u=>!u._isSubcombine),subUses=uses.filter(u=>u._isSubcombine);
- const threshold=settings.threshold;
- const ambiguous=lookup.items.filter(x=>x.id).length>1;
- const value=uses.length>=threshold?"HIGH VALUE":uses.length?"KEEP":"UNKNOWN";
- const result={name,uses,spellUses,subUses,value,ambiguous,ids:lookup.items.filter(x=>x.id).map(x=>x.id)};
+ const threshold=settings.threshold,ambiguous=lookup.items.filter(x=>x.id).length>1;
+ const autoValue=uses.length>=threshold?"HIGH VALUE":uses.length?"KEEP":"UNKNOWN";
+ const value=displayedLootValue(name,autoValue);
+ const result={name,uses,spellUses,subUses,value,autoValue,playerValueOverride,ambiguous,ids:lookup.items.filter(x=>x.id).map(x=>x.id)};
  liveClassificationCache.set(cacheKey,result);
- if(liveClassificationCache.size>2000){
-  const first=liveClassificationCache.keys().next().value;
-  if(first)liveClassificationCache.delete(first);
- }
+ if(liveClassificationCache.size>2000){const first=liveClassificationCache.keys().next().value;if(first)liveClassificationCache.delete(first)}
  return result;
 }
 function openLootUseModal(entry){
  if(!entry)return;
  const lookup=researchUsesForLootName(entry.item);let uses=lookup.uses||[];const ids=[...new Set((lookup.items||[]).map(x=>x.id).filter(Boolean))];
  $("#lootUseTitle").textContent=entry.item;$("#lootUseSubtitle").textContent=`Looted by: ${entry.looter||"Unknown"} • ${uses.length} verified Research use${uses.length===1?"":"s"}`;
- let html=ids.length>1?`<div class="loot-ambiguity"><strong>Multiple exact item IDs share this name:</strong> ${ids.join(", ")}. The EQ log does not identify which one dropped, so all verified uses are shown.</div>`:"";
+ const currentOverride=getLootValueOverride(entry.item);
+ let html=`<div class="loot-value-control"><div><strong>Player Value</strong><small>Changes alerts/value labels only. Verified Research uses remain intact.</small></div><select id="lootValueOverrideSelect"><option value="" ${!currentOverride?"selected":""}>Use Default Classification</option><option value="HIGH VALUE" ${currentOverride==="HIGH VALUE"?"selected":""}>High Value</option><option value="KEEP" ${currentOverride==="KEEP"?"selected":""}>Keep</option><option value="NOT VALUABLE" ${currentOverride==="NOT VALUABLE"?"selected":""}>Not Valuable</option></select></div>`;
+ if(ids.length>1)html+=`<div class="loot-ambiguity"><strong>Multiple exact item IDs share this name:</strong> ${ids.join(", ")}. The EQ log does not identify which one dropped, so all verified uses are shown.</div>`;
  if(!uses.length)html+=`<div class="loot-ambiguity">No verified use is indexed yet. Treat this as a coverage gap, not proof the item is useless.</div>`;
  else html+=`<div class="loot-use-grid">`+uses.map(u=>{const other=u.otherMissing;const readiness=u._evidenceOnly?"Verified use — recipe details incomplete":u.canMake?"READY NOW":other===1?"Missing 1 other component":other!=null?`Missing ${other} other components`:"Verified use";const rc=u.canMake?"ready":other===1?"one":"missing";const cls=(u.classes||[]).length?u.classes.join(", "):(u.class&&u.class!=="ALL"?u.class:"");return `<div class="loot-use-card"><h3><span class="use-type ${u._isSubcombine?"subcombine":""}">${u._isSubcombine?"SUBCOMBINE":"SPELL"}</span>${u._isSubcombine?esc(u.spell||u.name||"Unknown"):spellNameWithIcon(u.spell||u.name||"Unknown")}</h3><div class="meta">${cls?`${esc(cls)} • `:""}${u.trivial!=null?`Research ${u.trivial}`:"Research use verified"}${u.recipeId?` • Recipe #${u.recipeId}`:""}</div><div class="readiness ${rc}">${esc(readiness)}</div>${u.sourceUrl?`<div class="recipe-info"><a href="${esc(u.sourceUrl)}" target="_blank">Open Bastion source ↗</a></div>`:""}</div>`}).join("")+`</div>`;
- $("#lootUseBody").innerHTML=html;$("#lootUseModal").classList.remove("hidden");document.body.style.overflow="hidden";
+ $("#lootUseBody").innerHTML=html;
+ const valueSelect=$("#lootValueOverrideSelect");if(valueSelect)valueSelect.addEventListener("change",()=>{setLootValueOverride(entry.item,valueSelect.value);openLootUseModal(entry)});
+ $("#lootUseModal").classList.remove("hidden");document.body.style.overflow="hidden";
 }
 function closeLootUseModal(){$("#lootUseModal")?.classList.add("hidden");document.body.style.overflow="";}
 function renderLiveFeed(){
  const el=$("#liveLootFeed");if(!el)return;if(!liveLootFeed.length){el.innerHTML='<p class="muted">No live loot yet.</p>';return}
- el.innerHTML=liveLootFeed.slice(0,60).map((x,i)=>{const css=x.value==="HIGH VALUE"?"high":x.value==="KEEP"?"keep":x.value==="OTHER"?"other":x.value==="CHECKING"?"checking":"unknown";const recovery=x.corpseRecovery?` • CORPSE RECOVERY — not counted as a new drop`:"";return `<div class="live-loot-row ${css} clickable" tabindex="0" data-loot-index="${i}" title="${x.uses?"Click to see Research uses":"Click for item details"}"><div class="live-loot-head"><strong>${esc(x.item)}</strong><span class="live-value ${css}">${x.value}</span></div><div class="live-loot-looter">Looted by: ${esc(x.looter||"Unknown")}</div><div class="live-loot-meta">${esc(x.timestamp)}${x.zone?` • ${esc(x.zone)}`:""}${recovery}${x.uses?` • ${x.uses} verified use(s)`:""}</div>${x.ambiguous?`<div class="live-ambiguous">Multiple exact item IDs share this name; click to see all possibilities.</div>`:""}</div>`}).join("");
+ el.innerHTML=liveLootFeed.slice(0,60).map((x,i)=>{const css=x.value==="HIGH VALUE"?"high":x.value==="KEEP"?"keep":(x.value==="OTHER"||x.value==="NOT VALUABLE")?"other":x.value==="CHECKING"?"checking":"unknown";const recovery=x.corpseRecovery?` • CORPSE RECOVERY — not counted as a new drop`:"";const playerOverride=x.playerValueOverride?` • Player override: ${esc(x.playerValueOverride)}`:"";return `<div class="live-loot-row ${css} clickable" tabindex="0" data-loot-index="${i}" title="${x.uses?"Click to see Research uses":"Click for item details"}"><div class="live-loot-head"><strong>${esc(x.item)}</strong><span class="live-value ${css}">${x.value}</span></div><div class="live-loot-looter">Looted by: ${esc(x.looter||"Unknown")}</div><div class="live-loot-meta">${esc(x.timestamp)}${x.zone?` • ${esc(x.zone)}`:""}${recovery}${playerOverride}${x.uses?` • ${x.uses} verified use(s)`:""}</div>${x.ambiguous?`<div class="live-ambiguous">Multiple exact item IDs share this name; click to see all possibilities.</div>`:""}</div>`}).join("");
  document.querySelectorAll(".live-loot-row.clickable").forEach(row=>{const open=()=>openLootUseModal(liveLootFeed[Number(row.dataset.lootIndex)]);row.onclick=open;row.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open()}}});
 }
 function csvCell(v){const s=String(v??"");return /[",\r\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s}
@@ -584,8 +647,8 @@ function applySessionEvents(events){
   const key=canonical(e.item);
   if(!corpseRecovery)liveLootCounts.set(key,(liveLootCounts.get(key)||0)+1);
   if(e.countedAsOwned&&!corpseRecovery)liveOwnedCounts.set(key,(liveOwnedCounts.get(key)||0)+1);
-  const value=e.researchValue||"OTHER";
-  liveLootFeed.unshift({item:e.item,looter:e.looter||"Unknown",timestamp:e.timestamp||"",zone:e.zone||"",value,uses:Number(e.verifiedUses||0),ambiguous:!!e.ambiguous,ids:String(e.candidateIds||"").split("|").filter(Boolean).map(Number),corpseRecovery});
+  const cls=classifyLoot(e.item);const value=cls.value||e.researchValue||"OTHER";
+  liveLootFeed.unshift({item:e.item,looter:e.looter||"Unknown",timestamp:e.timestamp||"",zone:e.zone||"",value,uses:Number(e.verifiedUses||0),ambiguous:!!e.ambiguous,ids:String(e.candidateIds||"").split("|").filter(Boolean).map(Number),corpseRecovery,playerValueOverride:cls.playerValueOverride||""});
  }
  liveLootFeed=liveLootFeed.slice(0,120);
  evaluate();renderLiveFeed();renderLiveSession();renderSummary();renderList();renderDetail();renderReverseLookup();
@@ -730,7 +793,7 @@ function processLootEvent(evt,{isReplay=false,deferRender=false,provisionalAccep
  if(!isReplay){
   const sessionEntry={
    id:evt.id??null,sessionId:liveSessionId,timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",zoneId:evt.zoneId??currentZoneContext.zoneId??null,instanceId:evt.instanceId??currentZoneContext.instanceId??null,zoneVersion:evt.zoneVersion??currentZoneContext.zoneVersion??null,looter:evt.looter||"Unknown",self:!!evt.self,
-   item:evt.item||"",lootSource:corpseRecovery?"corpse_recovery":(evt.lootSource||"observed"),corpseRecovery,excludeFromObservedHistory:corpseRecovery||!!evt.excludeFromObservedHistory,researchValue:cls.uses.length?cls.value:(/^words? of |^rune of |grimoire|compendium|memoir|writ|tome|signet|emblem|bolts|card of /i.test(evt.item)?"UNKNOWN":""),
+   item:evt.item||"",lootSource:corpseRecovery?"corpse_recovery":(evt.lootSource||"observed"),corpseRecovery,excludeFromObservedHistory:corpseRecovery||!!evt.excludeFromObservedHistory,researchValue:cls.uses.length?cls.autoValue:(/^words? of |^rune of |grimoire|compendium|memoir|writ|tome|signet|emblem|bolts|card of /i.test(evt.item)?"UNKNOWN":""),playerValueOverride:cls.playerValueOverride||"",
    verifiedUses:cls.uses.length,ambiguous:!!cls.ambiguous,candidateIds:(cls.ids||[]).join("|"),
    tracked,countedAsOwned,ownershipMode:s.ownershipMode,recordedAt:new Date().toISOString()
   };
@@ -758,11 +821,14 @@ function processLootEvent(evt,{isReplay=false,deferRender=false,provisionalAccep
 
  let feedEntry=null;
  if(cls.uses.length){
-  feedEntry={eventId:evt.id??null,item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",value:cls.value,uses:cls.uses.length,ambiguous:cls.ambiguous,ids:cls.ids,corpseRecovery};
-  if(liveEnabled&&!corpseRecovery){if(cls.value==="HIGH VALUE"&&s.soundHigh)beep("high");else if(s.soundAny)beep("research");}
+  feedEntry={eventId:evt.id??null,item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",value:cls.value,uses:cls.uses.length,ambiguous:cls.ambiguous,ids:cls.ids,corpseRecovery,playerValueOverride:cls.playerValueOverride||""};
+  if(liveEnabled&&!corpseRecovery&&cls.value!=="NOT VALUABLE"){if(cls.value==="HIGH VALUE"&&s.soundHigh)beep("high");else if(cls.uses.length&&s.soundAny)beep("research");}
  }else if(!isReplay){
   const researchLooking=/^words? of |^rune of |grimoire|compendium|memoir|writ|tome|signet|emblem|bolts|card of /i.test(evt.item);
-  feedEntry={eventId:evt.id??null,item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",value:researchLooking?"UNKNOWN":"OTHER",uses:0,ambiguous:false,ids:[],corpseRecovery};
+  const defaultValue=researchLooking?"UNKNOWN":"OTHER";
+  const displayValue=cls.playerValueOverride?cls.value:defaultValue;
+  feedEntry={eventId:evt.id??null,item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",value:displayValue,uses:0,ambiguous:false,ids:[],corpseRecovery,playerValueOverride:cls.playerValueOverride||""};
+  if(liveEnabled&&!corpseRecovery&&cls.playerValueOverride==="HIGH VALUE"&&s.soundHigh)beep("high");
  }
 
  if(feedEntry){
@@ -788,7 +854,7 @@ function acceptLiveEventImmediately(evt){
  if(tracked){
   liveLootFeed.unshift({
    eventId:id,item:evt.item||"Unknown item",looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",
-   zone:evt.zone||currentZoneContext.zone||"",value:"CHECKING",uses:0,ambiguous:false,ids:[],corpseRecovery:!!evt.corpseRecovery||String(evt.lootSource||"").toLowerCase()==="corpse_recovery"
+   zone:evt.zone||currentZoneContext.zone||"",value:"CHECKING",uses:0,ambiguous:false,ids:[],corpseRecovery:!!evt.corpseRecovery||String(evt.lootSource||"").toLowerCase()==="corpse_recovery",playerValueOverride:getLootValueOverride(evt.item)
   });
   if(liveLootFeed.length>120)liveLootFeed.length=120;
  }
@@ -1415,6 +1481,8 @@ async function changeLogFile(){
  }
 }
 function setupLiveUI(){
+ loadLootValueOverrides();
+ renderLootValueOverrideManager();
  loadLiveSettings();
  refreshLiveHeaderStatus();
  if($("#enableLiveAlerts"))$("#enableLiveAlerts").textContent=liveEnabled?"Mute Sounds / Attention Alerts":"Enable Sounds / Attention Alerts";
@@ -1441,6 +1509,16 @@ function setupLiveUI(){
  
  
  document.addEventListener("click",e=>{
+ const clearOverride=e.target.closest?.("[data-clear-loot-override]");
+ if(clearOverride){e.preventDefault();const key=clearOverride.getAttribute("data-clear-loot-override");const row=lootValueOverrides[key];const name=(row&&typeof row==="object"&&row.name)||key;setLootValueOverride(name,"");return}
+ if(e.target.closest?.("#clearLootValueOverrides")){
+  e.preventDefault();
+  if(confirm("Clear all saved loot-value overrides and return every item to its default classification?")){
+   lootValueOverrides={};saveLootValueOverrides();liveClassificationCache.clear();renderLootValueOverrideManager();
+   for(const row of liveLootFeed){const cls=classifyLoot(row.item);row.value=cls.value;row.playerValueOverride=""}renderLiveFeed();
+  }
+  return;
+ }
  if(e.target.closest?.("#closeLootUseModal")){e.preventDefault();e.stopPropagation();closeLootUseModal();return}
  if(e.target.id==="lootUseModal"){e.preventDefault();closeLootUseModal()}
 });
@@ -1783,11 +1861,19 @@ function setupUpdaterUI(){
  $("#installVerifiedUpdate")?.addEventListener("click",installVerifiedUpdate);
 }
 
-setupUpdaterUI();
-setupUpdateNoticeUI();
-setupLiveUI();
-setupLootHistoryUI();
-setTimeout(loadUpdaterState,1200);
-setTimeout(loadObservedHistorySetting,900);
-setTimeout(restoreMagelo,700);
-render();
+async function bootApplication(){
+ const hydrated=await hydrateBrowserStateFromCompanion();
+ if(hydrated&&!sessionStorage.getItem("eqResearchBrowserStateHydrated")){
+  sessionStorage.setItem("eqResearchBrowserStateHydrated","1");location.reload();return;
+ }
+ startBrowserStatePersistence();
+ setupUpdaterUI();
+ setupUpdateNoticeUI();
+ setupLiveUI();
+ setupLootHistoryUI();
+ setTimeout(loadUpdaterState,1200);
+ setTimeout(loadObservedHistorySetting,900);
+ setTimeout(restoreMagelo,700);
+ render();
+}
+bootApplication();

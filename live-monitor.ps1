@@ -1,13 +1,14 @@
-param([string]$LogPath = "")
+﻿param([string]$LogPath = "")
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $configPath = Join-Path $root "monitor-config.json"
 $syncDataPath = Join-Path $root "data\bastion-synced-recipes.json"
-$userDataRoot = Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"
+$userDataRoot = if($env:EQRL_USER_DATA_ROOT){[IO.Path]::GetFullPath($env:EQRL_USER_DATA_ROOT)}else{Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"}
 if(-not (Test-Path -LiteralPath $userDataRoot)){New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null}
 $sessionStatePath = Join-Path $userDataRoot "session-loot.jsonl"
 $sessionMetaPath = Join-Path $userDataRoot "session-meta.json"
+$browserStatePath = Join-Path $userDataRoot "browser-state.json"
 $lootHistoryRoot = Join-Path $userDataRoot "history"
 if(-not(Test-Path -LiteralPath $lootHistoryRoot)){New-Item -ItemType Directory -Path $lootHistoryRoot -Force | Out-Null}
 $lootHistoryIndexPath = Join-Path $lootHistoryRoot "loot-history-index.json"
@@ -104,13 +105,41 @@ function Write-AtomicUtf8File([string]$Path,[string]$Content,[int]$MaxAttempts=2
     }
 }
 
+function Find-LikelyEverQuestLogs {
+    $found=@()
+    foreach($drive in @('C','D','E','F','G')){
+        foreach($sonyRoot in @("$drive`:\Program Files (x86)\Sony","$drive`:\Program Files\Sony")){
+            if(-not(Test-Path -LiteralPath $sonyRoot)){continue}
+            try{
+                foreach($dir in @(Get-ChildItem -LiteralPath $sonyRoot -Directory -ErrorAction SilentlyContinue)){
+                    $logs=Join-Path $dir.FullName 'Logs'
+                    if(Test-Path -LiteralPath $logs){$found+=Get-ChildItem -LiteralPath $logs -Filter 'eqlog_*.txt' -File -ErrorAction SilentlyContinue}
+                }
+            }catch{}
+        }
+    }
+    return @($found | Sort-Object LastWriteTime -Descending)
+}
 function Choose-LogFile {
     Add-Type -AssemblyName System.Windows.Forms
-    $dlg = New-Object System.Windows.Forms.OpenFileDialog
-    $dlg.Title = "Choose the active EverQuest log file"
-    $dlg.Filter = "EverQuest logs (eqlog_*.txt)|eqlog_*.txt|Text files (*.txt)|*.txt|All files (*.*)|*.*"
-    $dlg.Multiselect = $false
-    if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {return $dlg.FileName}
+    $candidates=@(Find-LikelyEverQuestLogs)
+    $now=Get-Date
+    $veryFresh=@($candidates | Where-Object {($_.LastWriteTime -ge $now.AddMinutes(-10))})
+
+    # A single actively-written log is authoritative. This avoids choosing a stale
+    # copy of the same character from an older Bastion installation.
+    if($veryFresh.Count -eq 1){ return $veryFresh[0].FullName }
+
+    $suggested=$null
+    if($veryFresh.Count -gt 0){$suggested=$veryFresh[0]}
+    elseif($candidates.Count -gt 0){$suggested=$candidates[0]}
+
+    $dlg=New-Object System.Windows.Forms.OpenFileDialog
+    $dlg.Title='Choose your CURRENT EverQuest character log - newest active log is preselected'
+    $dlg.Filter='EverQuest logs (eqlog_*.txt)|eqlog_*.txt|Text files (*.txt)|*.txt|All files (*.*)|*.*'
+    $dlg.Multiselect=$false
+    if($suggested){$dlg.InitialDirectory=$suggested.DirectoryName;$dlg.FileName=$suggested.Name}
+    if($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){return $dlg.FileName}
     return $null
 }
 function Strip-Html([string]$html) {
@@ -121,7 +150,7 @@ function Strip-Html([string]$html) {
     return ([regex]::Replace($x,'\s+',' ')).Trim()
 }
 function Invoke-Bastion([string]$url) {
-    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Research-Loot-Tool/0.17.2"}).Content
+    return (Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 45 -Headers @{"User-Agent"="EQ-Research-Loot-Tool/0.17.2-demo.3"}).Content
 }
 function Parse-RecipePage([int]$id,[string]$html) {
     $plain=Strip-Html $html
@@ -314,6 +343,7 @@ $script:corpseRecoveryActive=$false
 $script:corpseRecoveryActivatedAt=$null
 $script:corpseRecoveryLastLootAt=$null
 $script:corpseRecoveryFirstLootSeen=$false
+$script:corpseRecoveryDeathSeenAt=$null
 $script:corpseRecoveryStartWindowSeconds=120
 $script:corpseRecoveryIdleWindowSeconds=60
 $script:corpseRecoveryMaxWindowSeconds=600
@@ -324,15 +354,35 @@ function Reset-CorpseRecoveryContext {
     $script:corpseRecoveryActivatedAt=$null
     $script:corpseRecoveryLastLootAt=$null
     $script:corpseRecoveryFirstLootSeen=$false
+    $script:corpseRecoveryDeathSeenAt=$null
 }
 function Update-CorpseRecoveryContextFromLine([string]$line) {
     if(-not $line){return}
+
+    $death=[regex]::Match($line,'^\[(?<time>[^\]]+)\]\s*You have been slain by .+!\s*$')
+    if($death.Success){
+        Reset-CorpseRecoveryContext
+        $dt=Parse-EqLogTime $death.Groups['time'].Value
+        $script:corpseRecoveryDeathSeenAt=$(if($dt){$dt}else{Get-Date})
+        return
+    }
 
     $res=[regex]::Match($line,'^\[(?<time>[^\]]+)\]\s*You regain experience from resurrection\.')
     if($res.Success){
         $script:corpseRecoveryPending=$true
         $script:corpseRecoveryActive=$false
         $script:corpseRecoveryActivatedAt=$null
+        $script:corpseRecoveryLastLootAt=$null
+        $script:corpseRecoveryFirstLootSeen=$false
+        return
+    }
+
+    $returning=[regex]::Match($line,'^\[(?<time>[^\]]+)\]\s*Returning to Resurrect, please wait\.\.\.\s*$')
+    if($returning.Success -and $script:corpseRecoveryPending){
+        $t=Parse-EqLogTime $returning.Groups['time'].Value
+        $script:corpseRecoveryPending=$false
+        $script:corpseRecoveryActive=$true
+        $script:corpseRecoveryActivatedAt=$(if($t){$t}else{Get-Date})
         $script:corpseRecoveryLastLootAt=$null
         $script:corpseRecoveryFirstLootSeen=$false
         return
@@ -349,8 +399,14 @@ function Update-CorpseRecoveryContextFromLine([string]$line) {
             $script:corpseRecoveryFirstLootSeen=$false
             return
         }
-        # A second zone transition ends any unfinished recovery window.
-        if($script:corpseRecoveryActive){Reset-CorpseRecoveryContext}
+        if($script:corpseRecoveryActive){
+            $sameRezTransition=$false
+            if(-not $script:corpseRecoveryFirstLootSeen -and $script:corpseRecoveryActivatedAt){
+                $zt=$(if($t){$t}else{Get-Date})
+                $sameRezTransition=(($zt-$script:corpseRecoveryActivatedAt).TotalSeconds -le 30)
+            }
+            if(-not $sameRezTransition){Reset-CorpseRecoveryContext}
+        }
     }
 }
 function Get-CorpseRecoveryLootState([string]$timestamp) {
@@ -735,7 +791,7 @@ function Convert-VersionCore([string]$version){
     return [version]("{0}.{1}.{2}" -f $parts[0],$parts[1],$parts[2])
 }
 function Get-LatestGitHubRelease {
-    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.17.2";"Accept"="application/vnd.github+json"}
+    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.17.2-demo.3";"Accept"="application/vnd.github+json"}
     return Invoke-RestMethod -UseBasicParsing -Uri $updateApi -TimeoutSec 45 -Headers $headers
 }
 function Get-UpdateInfo {
@@ -775,7 +831,7 @@ function Download-AndVerifyLatestUpdate {
     $dest=Join-Path $updateStage $info.assetName
     $tmp=$dest+".download"
     if(Test-Path -LiteralPath $tmp){Remove-Item -LiteralPath $tmp -Force}
-    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.17.2"}
+    $headers=@{"User-Agent"="EQ-Research-Loot-Tool/0.17.2-demo.3"}
     try{
         Invoke-WebRequest -UseBasicParsing -Uri $info.assetUrl -OutFile $tmp -TimeoutSec 120 -Headers $headers
         $actual=(Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -844,9 +900,11 @@ $ErrorActionPreference="Stop"
 $work=Join-Path $env:TEMP ("EQSpellResearchInstall_" + [guid]::NewGuid().ToString("N"))
 $backupMade=$false
 $logPath=$BackupPath + ".updater.log"
-$userDataRoot=Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"
+$userDataRoot = if($env:EQRL_USER_DATA_ROOT){[IO.Path]::GetFullPath($env:EQRL_USER_DATA_ROOT)}else{Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"}
 if(-not(Test-Path -LiteralPath $userDataRoot)){New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null}
 $suppressBrowserPath=Join-Path $userDataRoot "suppress-browser-once.request"
+$portableMode=($env:EQRL_PORTABLE -eq "1")
+$portableDataBackup=$null
 function Write-UpdaterLog([string]$Message){
     try{Add-Content -LiteralPath $logPath -Value ((Get-Date).ToString("o") + " " + $Message) -Encoding UTF8}catch{}
 }
@@ -876,10 +934,16 @@ try {
     $configPath=Join-Path $Root "monitor-config.json"
     if(Test-Path -LiteralPath $configPath){$preservedConfig=Get-Content -LiteralPath $configPath -Raw}
 
+    if($portableMode -and (Test-Path -LiteralPath $userDataRoot)){
+        $portableDataBackup=Join-Path $env:TEMP ("EQRLPortableData_" + [guid]::NewGuid().ToString("N"))
+        New-Item -ItemType Directory -Path $portableDataBackup -Force | Out-Null
+        Get-ChildItem -LiteralPath $userDataRoot -Force | ForEach-Object {Copy-Item -LiteralPath $_.FullName -Destination $portableDataBackup -Recurse -Force}
+        Write-UpdaterLog ("Portable user data safeguarded at: " + $portableDataBackup)
+    }
     Write-UpdaterLog "Companion exited and package verified. Copying current application contents to rollback backup."
     if(Test-Path -LiteralPath $BackupPath){Remove-Item -LiteralPath $BackupPath -Recurse -Force -ErrorAction SilentlyContinue}
     New-Item -ItemType Directory -Path $BackupPath -Force | Out-Null
-    Get-ChildItem -LiteralPath $Root -Force | ForEach-Object {
+    Get-ChildItem -LiteralPath $Root -Force | Where-Object { -not ($portableMode -and $_.FullName -eq $userDataRoot) } | ForEach-Object {
         Copy-Item -LiteralPath $_.FullName -Destination $BackupPath -Recurse -Force
     }
     $backupMade=$true
@@ -887,13 +951,19 @@ try {
     # Keep the active root directory itself in place. This avoids Windows
     # Explorer following a renamed/moved install folder into the backup path.
     Write-UpdaterLog "Backup copy completed. Replacing application contents in-place."
-    Get-ChildItem -LiteralPath $Root -Force | ForEach-Object {
+    Get-ChildItem -LiteralPath $Root -Force | Where-Object { -not ($portableMode -and $_.FullName -eq $userDataRoot) } | ForEach-Object {
         Remove-Item -LiteralPath $_.FullName -Recurse -Force
     }
     Get-ChildItem -LiteralPath $payload -Force | ForEach-Object {
         Move-Item -LiteralPath $_.FullName -Destination $Root -Force
     }
     if($preservedConfig -ne $null){Set-Content -LiteralPath (Join-Path $Root "monitor-config.json") -Value $preservedConfig -Encoding UTF8}
+    if($portableMode -and $portableDataBackup -and (Test-Path -LiteralPath $portableDataBackup)){
+        if(-not(Test-Path -LiteralPath $userDataRoot)){New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null}
+        Get-ChildItem -LiteralPath $portableDataBackup -Force | ForEach-Object {Copy-Item -LiteralPath $_.FullName -Destination $userDataRoot -Recurse -Force}
+        Write-UpdaterLog "Portable user data restored after application replacement."
+    }
+
 
     $result=[pscustomobject]@{
         ok=$true
@@ -918,8 +988,8 @@ try {
         }
     } catch { Write-UpdaterLog ("Backup retention warning: " + $_.Exception.Message) }
 
-    # Rebuild the normal desktop shortcut so it always points at the newly
-    # installed application root rather than an older extracted copy.
+    # Rebuild the normal desktop shortcut only for desktop mode.
+    if(-not $portableMode){
     try {
         $desktop=[Environment]::GetFolderPath('Desktop')
         $shortcutPath=Join-Path $desktop 'EverQuest Research & Loot Tool.lnk'
@@ -940,8 +1010,9 @@ try {
     } catch {
         Write-UpdaterLog ("Desktop shortcut refresh warning: " + $_.Exception.Message)
     }
+    }
 
-    $vbs=Join-Path $Root "EverQuest Research & Loot Tool.vbs"
+    $vbs=Join-Path $Root $(if($portableMode){"EverQuest Research & Loot Tool Portable.vbs"}else{"EverQuest Research & Loot Tool.vbs"})
     $wscript=Join-Path $env:WINDIR "System32\wscript.exe"
     Set-Content -LiteralPath $suppressBrowserPath -Value ((Get-Date).ToString("o")) -Encoding ASCII
     Write-UpdaterLog "Install completed. Restarting application directly through wscript.exe without cmd.exe."
@@ -953,7 +1024,7 @@ try {
     try {
         if($backupMade -and (Test-Path -LiteralPath $BackupPath)){
             if(-not(Test-Path -LiteralPath $Root)){New-Item -ItemType Directory -Path $Root -Force | Out-Null}
-            Get-ChildItem -LiteralPath $Root -Force -ErrorAction SilentlyContinue | ForEach-Object {
+            Get-ChildItem -LiteralPath $Root -Force -ErrorAction SilentlyContinue | Where-Object { -not ($portableMode -and $_.FullName -eq $userDataRoot) } | ForEach-Object {
                 Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
             }
             Get-ChildItem -LiteralPath $BackupPath -Force | ForEach-Object {
@@ -964,7 +1035,7 @@ try {
         $err=[pscustomobject]@{ok=$false;error=$message;failedAt=(Get-Date).ToString("o")} | ConvertTo-Json -Depth 4
         if(Test-Path -LiteralPath $Root){
             $err | Set-Content -LiteralPath (Join-Path $Root "update-result.json") -Encoding UTF8
-            $rollbackVbs=Join-Path $Root "EverQuest Research & Loot Tool.vbs"
+            $rollbackVbs=Join-Path $Root $(if($portableMode){"EverQuest Research & Loot Tool Portable.vbs"}else{"EverQuest Research & Loot Tool.vbs"})
             if(Test-Path -LiteralPath $rollbackVbs){
                 $wscript=Join-Path $env:WINDIR "System32\wscript.exe"
                 Set-Content -LiteralPath $suppressBrowserPath -Value ((Get-Date).ToString("o")) -Encoding ASCII
@@ -974,6 +1045,7 @@ try {
     } catch { Write-UpdaterLog ("ROLLBACK ERROR: " + $_.Exception.Message) }
 } finally {
     if(Test-Path -LiteralPath $work){Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue}
+    if($portableDataBackup -and (Test-Path -LiteralPath $portableDataBackup)){Remove-Item -LiteralPath $portableDataBackup -Recurse -Force -ErrorAction SilentlyContinue}
     Remove-Item -LiteralPath $MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue
 }
 '@
@@ -1356,7 +1428,7 @@ Start-LiveEventWorker
 
 $shutdownForUpdate=$false
 $listener=New-Object Net.HttpListener;$prefix="http://127.0.0.1:$port/";$listener.Prefixes.Add($prefix);$listener.Start()
-Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.17.2";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
+Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.17.3";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
 
 try{
 while($listener.IsListening){
@@ -1371,6 +1443,24 @@ while($listener.IsListening){
         $path=$req.Url.AbsolutePath
 
 
+        if($path -eq "/api/browser-state"){
+            try{
+                if($req.HttpMethod -eq "GET"){
+                    $state=$null
+                    if(Test-Path -LiteralPath $browserStatePath){
+                        try{$state=Get-Content -LiteralPath $browserStatePath -Raw|ConvertFrom-Json}catch{$state=$null}
+                    }
+                    $payload=([pscustomobject]@{ok=$true;state=$state;portable=($env:EQRL_PORTABLE -eq "1");userDataRoot=$userDataRoot}|ConvertTo-Json -Depth 12)
+                } elseif($req.HttpMethod -eq "POST"){
+                    $body=Read-RequestJson $req
+                    $state=$body.state
+                    if($null -eq $state){$state=[pscustomobject]@{}}
+                    $state|ConvertTo-Json -Depth 20|Set-Content -LiteralPath $browserStatePath -Encoding UTF8
+                    $payload=([pscustomobject]@{ok=$true;portable=($env:EQRL_PORTABLE -eq "1");userDataRoot=$userDataRoot}|ConvertTo-Json -Depth 6)
+                } else {$res.StatusCode=405;$payload=([pscustomobject]@{ok=$false;error="Method not allowed"}|ConvertTo-Json)}
+            }catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
+            $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
+        }
         if($path -eq "/api/session-state"){
             try{$payload=(Get-SessionState|ConvertTo-Json -Depth 12)}catch{$payload=([pscustomobject]@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json);$res.StatusCode=500}
             $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
@@ -1507,6 +1597,7 @@ while($listener.IsListening){
                     corpseRecoveryActive=[bool]$script:corpseRecoveryActive
                     corpseRecoveryFirstLootSeen=[bool]$script:corpseRecoveryFirstLootSeen
                     corpseRecoveryLastLootAt=$(if($script:corpseRecoveryLastLootAt){$script:corpseRecoveryLastLootAt.ToString("o")}else{$null})
+                    corpseRecoveryDeathSeenAt=$(if($script:corpseRecoveryDeathSeenAt){$script:corpseRecoveryDeathSeenAt.ToString("o")}else{$null})
                     staleSessionRejects=[int]$script:staleSessionRejects
                     events=$selected
                     serverTime=(Get-Date).ToString("o")
@@ -1530,7 +1621,7 @@ while($listener.IsListening){
         if($path -eq "/api/status"){
             $sync=$null;if(Test-Path $syncDataPath){try{$sync=Get-Content $syncDataPath -Raw|ConvertFrom-Json}catch{}}
             $appVersion=Get-AppVersionInfo
-            $payload=[pscustomobject]@{app="EverQuest Research & Loot Tool";version=[string]$appVersion.version;channel=[string]$appVersion.channel;root=$root;active=$true;logPath=$logPath;logFile=$logFileName;character=$character;lastEventId=$nextId-1;position=$position;sessionStartPosition=$script:sessionStartPosition;sessionResetAt=$script:sessionResetAt;sessionId=[string]$script:sessionId;currentZone=$script:currentZone;currentZoneId=$script:currentZoneId;currentInstanceId=$script:currentInstanceId;currentZoneVersion=$script:currentZoneVersion;currentZoneEnteredAt=$script:currentZoneEnteredAt;observedLootHistoryEnabled=($config.observedLootHistoryEnabled -ne $false);staleSessionRejects=[int]$script:staleSessionRejects;sync=$(if($sync){[pscustomobject]@{syncedAt=$sync.syncedAt;recipeCount=@($sync.recipes).Count;errors=@($sync.errors).Count}}else{$null})}|ConvertTo-Json -Depth 8
+            $payload=[pscustomobject]@{app="EverQuest Research & Loot Tool";version=[string]$appVersion.version;channel=[string]$appVersion.channel;root=$root;active=$true;logPath=$logPath;logFile=$logFileName;character=$character;lastEventId=$nextId-1;position=$position;sessionStartPosition=$script:sessionStartPosition;sessionResetAt=$script:sessionResetAt;sessionId=[string]$script:sessionId;currentZone=$script:currentZone;currentZoneId=$script:currentZoneId;currentInstanceId=$script:currentInstanceId;currentZoneVersion=$script:currentZoneVersion;currentZoneEnteredAt=$script:currentZoneEnteredAt;observedLootHistoryEnabled=($config.observedLootHistoryEnabled -ne $false);portableMode=($env:EQRL_PORTABLE -eq "1");userDataRoot=$userDataRoot;staleSessionRejects=[int]$script:staleSessionRejects;sync=$(if($sync){[pscustomobject]@{syncedAt=$sync.syncedAt;recipeCount=@($sync.recipes).Count;errors=@($sync.errors).Count}}else{$null})}|ConvertTo-Json -Depth 8
             $bytes=[Text.Encoding]::UTF8.GetBytes($payload);$res.ContentType="application/json; charset=utf-8";$res.StatusCode=200;$res.ContentLength64=$bytes.Length;$res.OutputStream.Write($bytes,0,$bytes.Length);continue
         }
         if($path -eq "/api/events"){
