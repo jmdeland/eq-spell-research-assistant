@@ -355,6 +355,13 @@ html[data-skin="eqred"] .autocomplete-option:hover,html[data-skin="eqred"] .auto
 .live-log-mark{font-size:9px;font-weight:900;letter-spacing:.1em;color:var(--accent)}
 #liveMonitorSummary{max-width:900px}
 #liveOwnershipSummary{color:var(--muted)}
+#liveOwnershipSummary strong{
+  color:var(--text);
+  font-weight:900;
+  text-decoration:underline;
+  text-decoration-thickness:2px;
+  text-underline-offset:3px
+}
 .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 @media(max-width:760px){.live-heading-status{justify-content:flex-start}.live-log-badge{max-width:100%}}
 

@@ -1,4 +1,4 @@
-﻿param([switch]$NoPause)
+﻿param([switch]$NoPause,[switch]$RefreshOnly)
 
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -14,6 +14,81 @@ $portableDataRoot=Join-Path $root 'portable-data'
 $userDataRoot=Join-Path $env:LOCALAPPDATA 'EverQuest Research & Loot Tool'
 $desktopHistoryRoot=Join-Path $userDataRoot 'history'
 $portableHistoryRoot=Join-Path $portableDataRoot 'history'
+
+
+function Install-PersistentDesktopLauncher {
+    param([string]$ApplicationRoot)
+
+    if(-not(Test-Path -LiteralPath $userDataRoot)){
+        New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null
+    }
+
+    $version='current'
+    try{
+        $versionPath=Join-Path $ApplicationRoot 'app-version.json'
+        if(Test-Path -LiteralPath $versionPath){
+            $version=[string]((Get-Content -LiteralPath $versionPath -Raw | ConvertFrom-Json).version)
+        }
+    }catch{}
+    $safeVersion=($version -replace '[^0-9A-Za-z._-]','_')
+
+    $installRootPath=Join-Path $userDataRoot 'install-root.txt'
+    Set-Content -LiteralPath $installRootPath -Value $ApplicationRoot -Encoding Unicode
+
+    $persistentLauncher=Join-Path $userDataRoot 'EverQuest Research & Loot Tool Launcher.vbs'
+    $launcher=@'
+Option Explicit
+Dim shell, fso, dataRoot, rootFile, appRoot, trayScript, ts, cmd
+Set shell = CreateObject("WScript.Shell")
+Set fso = CreateObject("Scripting.FileSystemObject")
+dataRoot = shell.ExpandEnvironmentStrings("%LOCALAPPDATA%\EverQuest Research & Loot Tool")
+rootFile = fso.BuildPath(dataRoot, "install-root.txt")
+If Not fso.FileExists(rootFile) Then
+  shell.Popup "The desktop app location is not configured. Run START HERE.bat from the current EverQuest Research & Loot Tool folder and choose Desktop Mode.", 0, "EverQuest Research & Loot Tool", 48
+  WScript.Quit 2
+End If
+Set ts = fso.OpenTextFile(rootFile, 1, False, -1)
+appRoot = Trim(ts.ReadLine)
+ts.Close
+trayScript = fso.BuildPath(appRoot, "research-tool-tray.ps1")
+If Not fso.FileExists(trayScript) Then
+  shell.Popup "The saved application folder no longer exists or is incomplete:" & vbCrLf & appRoot & vbCrLf & vbCrLf & "Run START HERE.bat from the current folder and choose Desktop Mode to repair the shortcut.", 0, "EverQuest Research & Loot Tool", 48
+  WScript.Quit 3
+End If
+shell.CurrentDirectory = shell.ExpandEnvironmentStrings("%TEMP%")
+cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File """ & trayScript & """ -Root """ & appRoot & """"
+shell.Run cmd, 0, False
+'@
+    Set-Content -LiteralPath $persistentLauncher -Value $launcher -Encoding ASCII
+
+    $sourceIcon=Join-Path $ApplicationRoot 'EverQuestResearchLoot.ico'
+    $persistentIcon=Join-Path $userDataRoot ("EverQuestResearchLoot-"+$safeVersion+".ico")
+    if(Test-Path -LiteralPath $sourceIcon){ Copy-Item -LiteralPath $sourceIcon -Destination $persistentIcon -Force }
+
+    # A version-specific icon path avoids Windows continuing to display a cached icon from an older build.
+    try{
+        Get-ChildItem -LiteralPath $userDataRoot -Filter 'EverQuestResearchLoot-*.ico' -File -ErrorAction SilentlyContinue |
+            Where-Object {$_.FullName -ne $persistentIcon} |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -Skip 2 |
+            Remove-Item -Force -ErrorAction SilentlyContinue
+    }catch{}
+
+    $desktop=[Environment]::GetFolderPath('Desktop')
+    $shortcutPath=Join-Path $desktop 'EverQuest Research & Loot Tool.lnk'
+    $wscript=Join-Path $env:WINDIR 'System32\wscript.exe'
+    if(Test-Path -LiteralPath $shortcutPath){ Remove-Item -LiteralPath $shortcutPath -Force -ErrorAction SilentlyContinue }
+    $ws=New-Object -ComObject WScript.Shell
+    $sc=$ws.CreateShortcut($shortcutPath)
+    $sc.TargetPath=$wscript
+    $sc.Arguments='"'+$persistentLauncher+'"'
+    $sc.WorkingDirectory=$env:TEMP
+    if(Test-Path -LiteralPath $persistentIcon){$sc.IconLocation=$persistentIcon+',0'}
+    $sc.Description='Launch EverQuest Research & Loot Tool'
+    $sc.Save()
+
+    return [pscustomobject]@{Shortcut=$shortcutPath;Launcher=$persistentLauncher;Icon=$persistentIcon;Version=$version}
+}
 
 function Get-PortableUserFiles {
     if(-not(Test-Path -LiteralPath $portableDataRoot)){ return @() }
@@ -165,6 +240,7 @@ function Copy-PortableNonHistoryData {
     return $copied
 }
 
+if(-not $RefreshOnly){
 Clear-Host
 Write-Host ''
 Write-Host 'EverQuest Research & Loot Tool - Desktop Setup' -ForegroundColor Cyan
@@ -230,30 +306,15 @@ if($portableDataDetected){
     Write-Host 'No portable user data was detected. Desktop setup will continue.' -ForegroundColor DarkGray
 }
 
+}
+
 Write-Host ''
 if(-not(Test-Path -LiteralPath $vbs)){throw "Launcher not found: $vbs"}
-
-if(Test-Path -LiteralPath $shortcutPath){
-    Remove-Item -LiteralPath $shortcutPath -Force -ErrorAction Stop
-}
-
-$ws=New-Object -ComObject WScript.Shell
-$sc=$ws.CreateShortcut($shortcutPath)
-$sc.TargetPath=$wscript
-$sc.Arguments='"'+$vbs+'"'
-$sc.WorkingDirectory=$env:TEMP
-$sc.IconLocation=$icon+',0'
-$sc.Description='Launch EverQuest Research & Loot Tool'
-$sc.Save()
-
-if(-not(Test-Path -LiteralPath $userDataRoot)){
-    New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null
-}
-Set-Content -LiteralPath (Join-Path $userDataRoot 'install-root.txt') -Value $root -Encoding UTF8
-
-Write-Host ''
-Write-Host 'Desktop shortcut refreshed successfully.' -ForegroundColor Green
-Write-Host ('Shortcut: ' + $shortcutPath)
+$desktopInstall=Install-PersistentDesktopLauncher -ApplicationRoot $root
+Write-Host 'Desktop launcher refreshed successfully.' -ForegroundColor Green
+Write-Host ('Shortcut: ' + $desktopInstall.Shortcut)
 Write-Host ('Current app: ' + $root)
+Write-Host ('Launcher: ' + $desktopInstall.Launcher)
+Write-Host ('Icon: ' + $desktopInstall.Icon)
 Write-Host ''
 if(-not $NoPause){Read-Host 'Press Enter to close Desktop Setup'}

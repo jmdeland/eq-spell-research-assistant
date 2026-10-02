@@ -1,5 +1,60 @@
 # Changelog
 
+## v0.17.4
+
+### Stable Final Polish Release
+- Promotes the tested v0.17.4-demo.4 behavior to stable.
+- Bolds the active Live Loot ownership mode label in the monitor summary for faster visual confirmation.
+- Includes native Windows-side loot alert audio so normal High Value and Research sounds are not delayed by browser-tab focus.
+- Includes Live Event Worker startup-readiness improvements and diagnostics.
+- Includes the persistent LocalAppData desktop launcher, PowerShell 5.1 path-encoding fix, and version-specific shortcut icon handling.
+- Retains safe Portable/Desktop migration, backup-first history handling, active EQ log selection, two-character Magelo, loot-value overrides, corpse-recovery protection, session persistence, and permanent Observed Loot History.
+- No intended behavioral changes from the accepted demo.4 baseline beyond the ownership-mode text emphasis.
+
+## v0.17.4-demo.4
+
+### Final Polish — Live Worker Startup Readiness
+- Keeps the native Windows alert audio behavior from demo.3 unchanged.
+- Adds a precomputed Research-use map so the Live Event Worker no longer has to rebuild hundreds of Research component relationships at startup.
+- Opens the 8767 listener before zone/alert initialization, eliminating the normal connection-refused window during startup.
+- Uses a fast 2 MB zone-tail scan first and falls back to the prior 16 MB scan only when needed.
+- Adds worker readiness/startup timing fields to the native alert status and Live Loot payload for diagnostics.
+- Shows `STARTING` / `Live Loot worker is starting…` during the first 20 seconds instead of immediately presenting the worker as broken.
+- No intended changes to loot classification, native alert decisions, session/history persistence, Magelo, corpse recovery, or Desktop/Portable migration.
+
+## v0.17.4-demo.3
+
+### Native Windows Loot Alert Audio
+- Moves normal High Value and Any Research alert playback into the dedicated Live Event Worker so alert timing no longer depends on an active/foreground browser tab.
+- Reads the saved alert preferences, volume, high-value threshold, include-others preference, and player loot-value overrides from the persisted browser-state file.
+- Uses the packaged Bastion Research corpus to classify verified Research components directly in the worker.
+- Suppresses native alerts for corpse-recovery loot and for items marked Not Valuable.
+- Keeps class-only alerting browser-side because exact class filtering depends on the browser's current class selection; this avoids inaccurate native alerts.
+- Routes browser-triggered craftable tones through the native Windows sound endpoint, with WebAudio retained only as a fallback if native playback is unavailable.
+- Adds native alert status/test endpoints on the Live Event Worker for diagnostics.
+- Persists the Sounds Enabled/Muted state so the worker honors the user's mute choice.
+- Retains the demo.2 persistent desktop launcher / BOM fix and all v0.17.3 behavior.
+
+## v0.17.4-demo.2
+
+### Desktop launcher path encoding fix
+- Fixes a Windows PowerShell 5.1 encoding mismatch in `install-root.txt` that could prepend the visible `ï»¿` characters to the saved application path.
+- Desktop Setup now writes `install-root.txt` as UTF-16 Unicode and the persistent VBScript launcher explicitly reads it as Unicode.
+- This prevents the desktop shortcut from reporting that a valid application folder is missing when its saved path actually exists.
+- Retains the demo.1 persistent launcher, version-specific icon path, background-audio resume handling, updater integration, and all v0.17.3 behavior.
+
+## v0.17.4-demo.1
+
+### Final Polish Candidate
+- Replaces root-specific Desktop shortcuts with a persistent LocalAppData launcher that resolves the current Desktop application root through `install-root.txt`.
+- Removes tray startup behavior that could repoint the Desktop shortcut back to whichever older/demo folder happened to be launched.
+- Centralizes Desktop shortcut refresh through Desktop Setup and the verified updater.
+- Uses a version-specific LocalAppData icon path to reduce stale Windows shortcut-icon caching.
+- Makes browser alert audio resume its AudioContext before every alert and when the tab/window becomes visible or focused again.
+- Updates end-user UI wording to use `START HERE.bat` instead of legacy launcher scripts.
+- Adds Desktop launcher consistency checks to Check / Repair Setup.
+- No intended changes to Research data, Magelo parsing, Live Loot event semantics, Observed History, session persistence, corpse-recovery classification, or portable-data migration rules.
+
 ## v0.17.3
 
 ### Easy Start / Portable Mode

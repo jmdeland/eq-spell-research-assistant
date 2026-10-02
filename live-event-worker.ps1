@@ -8,6 +8,10 @@ $configPath=Join-Path $root "monitor-config.json"
 $appVersionPath=Join-Path $root "app-version.json"
 $userDataRoot = if($env:EQRL_USER_DATA_ROOT){[IO.Path]::GetFullPath($env:EQRL_USER_DATA_ROOT)}else{Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"}
 $sessionMetaPath=Join-Path $userDataRoot "session-meta.json"
+$browserStatePath=Join-Path $userDataRoot "browser-state.json"
+$nativeAlertCache=@{}
+$nativeAlertLastKind=""
+$nativeAlertLastAt=$null
 
 function Read-Config {
     if(Test-Path -LiteralPath $configPath){
@@ -20,6 +24,184 @@ function Read-AppVersion {
         try{return (Get-Content -LiteralPath $appVersionPath -Raw|ConvertFrom-Json)}catch{}
     }
     return [pscustomobject]@{version="unknown";channel="demo"}
+}
+function Normalize-NativeAlertName([string]$value){
+    if([string]::IsNullOrWhiteSpace($value)){return ""}
+    $x=$value.ToLowerInvariant().Replace([char]0x2019,'`').Replace("'",'`')
+    return ([regex]::Replace($x,'\s+',' ')).Trim()
+}
+function Build-NativeResearchUseMap {
+    $map=@{}
+    $precomputed=Join-Path $root 'data\native-research-use-map.json'
+    if(Test-Path -LiteralPath $precomputed){
+        try{
+            $data=Get-Content -LiteralPath $precomputed -Raw|ConvertFrom-Json
+            if($data.items){
+                foreach($prop in $data.items.PSObject.Properties){
+                    $keys=@($prop.Value)
+                    $h=@{}
+                    foreach($key in $keys){if($key){$h[[string]$key]=$true}}
+                    $map[[string]$prop.Name]=$h
+                }
+                if($map.Count -gt 0){return $map}
+            }
+        }catch{}
+    }
+
+    # Safe fallback for older/custom data packs that do not include the precomputed map.
+    $paths=@(
+        (Join-Path $root 'data\bastion-synced-recipes.json'),
+        (Join-Path $root 'data\bastion-recipes.json')
+    )
+    foreach($path in $paths){
+        if(-not(Test-Path -LiteralPath $path)){continue}
+        try{
+            $data=Get-Content -LiteralPath $path -Raw|ConvertFrom-Json
+            $all=@()
+            if($data.recipes){$all+=@($data.recipes)}
+            if($data.subcombines){$all+=@($data.subcombines)}
+            foreach($recipe in $all){
+                $recipeKey=[string]$(if($recipe.recipeId){$recipe.recipeId}elseif($recipe.recipeKey){$recipe.recipeKey}elseif($recipe.spell){$recipe.spell}elseif($recipe.name){$recipe.name}else{[guid]::NewGuid().ToString()})
+                foreach($component in @($recipe.components)){
+                    if($component.vendorBasic -eq $true){continue}
+                    $name=Normalize-NativeAlertName ([string]$component.name)
+                    if(-not $name){continue}
+                    if(-not $map.ContainsKey($name)){$map[$name]=@{}}
+                    $map[$name][$recipeKey]=$true
+                }
+            }
+        }catch{}
+    }
+    return $map
+}
+function Read-NativeAlertSettings {
+    $result=[ordered]@{
+        enabled=$true
+        soundHigh=$true
+        soundAny=$false
+        soundCraftable=$true
+        threshold=5
+        volume=0.65
+        includeOthers=$false
+        classOnly=$false
+        overrides=@{}
+    }
+    if(Test-Path -LiteralPath $browserStatePath){
+        try{
+            $outer=Get-Content -LiteralPath $browserStatePath -Raw|ConvertFrom-Json
+            if($outer.eqResearchLiveSettings){
+                try{
+                    $ls=[string]$outer.eqResearchLiveSettings|ConvertFrom-Json
+                    if($null -ne $ls.enabled){$result.enabled=[bool]$ls.enabled}
+                    if($null -ne $ls.soundHigh){$result.soundHigh=[bool]$ls.soundHigh}
+                    if($null -ne $ls.soundAny){$result.soundAny=[bool]$ls.soundAny}
+                    if($null -ne $ls.soundCraftable){$result.soundCraftable=[bool]$ls.soundCraftable}
+                    if($ls.threshold){$result.threshold=[Math]::Max(1,[int]$ls.threshold)}
+                    if($null -ne $ls.volume){$result.volume=[Math]::Max(0,[Math]::Min(1,[double]$ls.volume))}
+                    if($null -ne $ls.includeOthers){$result.includeOthers=[bool]$ls.includeOthers}
+                    if($null -ne $ls.classOnly){$result.classOnly=[bool]$ls.classOnly}
+                }catch{}
+            }
+            if($outer.eqResearchLootValueOverridesV1){
+                try{$result.overrides=[string]$outer.eqResearchLootValueOverridesV1|ConvertFrom-Json -AsHashtable}catch{
+                    try{
+                        $obj=[string]$outer.eqResearchLootValueOverridesV1|ConvertFrom-Json
+                        $h=@{}
+                        foreach($prop in $obj.PSObject.Properties){$h[$prop.Name]=$prop.Value}
+                        $result.overrides=$h
+                    }catch{}
+                }
+            }
+        }catch{}
+    }
+    return [pscustomobject]$result
+}
+function Get-NativeOverride([hashtable]$overrides,[string]$item){
+    if(-not $overrides){return ""}
+    $key=Normalize-NativeAlertName $item
+    $raw=$null
+    if($overrides.ContainsKey($key)){$raw=$overrides[$key]}
+    if($null -eq $raw){return ""}
+    $value=$raw
+    if($raw -isnot [string] -and $raw.PSObject.Properties['value']){$value=$raw.value}
+    $v=([string]$value).ToUpperInvariant().Replace('_',' ').Trim()
+    if(@('HIGH VALUE','KEEP','NOT VALUABLE') -contains $v){return $v}
+    return ""
+}
+function New-NativeTonePlayer([string]$kind,[double]$volume){
+    $pct=[int][Math]::Round([Math]::Max(0,[Math]::Min(1,$volume))*100)
+    $cacheKey="$kind|$pct"
+    if($script:nativeAlertCache.ContainsKey($cacheKey)){return $script:nativeAlertCache[$cacheKey].player}
+    $plan=switch($kind){
+        'high' {@(@(880,120),@(1175,160));break}
+        'craftable' {@(@(740,120),@(988,120),@(1318,220));break}
+        default {@(@(660,100));break}
+    }
+    $sampleRate=22050
+    $samples=New-Object 'System.Collections.Generic.List[Int16]'
+    $amp=[Math]::Round(32767.0*[Math]::Max(0.03,$volume)*0.28)
+    foreach($part in $plan){
+        $freq=[double]$part[0];$durationMs=[int]$part[1]
+        $count=[int]($sampleRate*$durationMs/1000.0)
+        for($i=0;$i -lt $count;$i++){
+            $sample=[int][Math]::Round($amp*[Math]::Sin(2.0*[Math]::PI*$freq*$i/$sampleRate))
+            if($sample -gt 32767){$sample=32767};if($sample -lt -32768){$sample=-32768}
+            [void]$samples.Add([int16]$sample)
+        }
+        $gap=[int]($sampleRate*0.05)
+        for($i=0;$i -lt $gap;$i++){[void]$samples.Add([int16]0)}
+    }
+    $dataBytes=$samples.Count*2
+    $ms=New-Object IO.MemoryStream
+    $bw=New-Object IO.BinaryWriter($ms)
+    $bw.Write([Text.Encoding]::ASCII.GetBytes('RIFF'))
+    $bw.Write([int](36+$dataBytes))
+    $bw.Write([Text.Encoding]::ASCII.GetBytes('WAVE'))
+    $bw.Write([Text.Encoding]::ASCII.GetBytes('fmt '))
+    $bw.Write([int]16);$bw.Write([int16]1);$bw.Write([int16]1)
+    $bw.Write([int]$sampleRate);$bw.Write([int]($sampleRate*2));$bw.Write([int16]2);$bw.Write([int16]16)
+    $bw.Write([Text.Encoding]::ASCII.GetBytes('data'));$bw.Write([int]$dataBytes)
+    foreach($sample in $samples){$bw.Write([int16]$sample)}
+    $bw.Flush();$ms.Position=0
+    $player=New-Object System.Media.SoundPlayer($ms)
+    try{$player.Load()}catch{}
+    $script:nativeAlertCache[$cacheKey]=[pscustomobject]@{player=$player;stream=$ms;writer=$bw}
+    return $player
+}
+function Play-NativeAlert([string]$kind,[double]$volume){
+    try{
+        if($volume -le 0){return $false}
+        $player=New-NativeTonePlayer $kind $volume
+        if($player){$player.Play();$script:nativeAlertLastKind=$kind;$script:nativeAlertLastAt=Get-Date;return $true}
+    }catch{}
+    return $false
+}
+$nativeResearchUseMap=@{}
+$workerStartedAt=Get-Date
+$listenerStartedAt=$null
+$workerReadyAt=$null
+function Invoke-NativeLootAlert($evt){
+    if(-not $evt -or $evt.corpseRecovery){return}
+    $settings=Read-NativeAlertSettings
+    if(-not $settings.enabled -or $settings.volume -le 0){return}
+    if(-not $evt.self -and -not $settings.includeOthers){return}
+    # Class-only filtering depends on the browser's selected class. Keep the
+    # browser fallback for that uncommon mode rather than play an inaccurate alert.
+    if($settings.classOnly){return}
+    $name=Normalize-NativeAlertName ([string]$evt.item)
+    $uses=0
+    if($nativeResearchUseMap.ContainsKey($name)){$uses=[int]$nativeResearchUseMap[$name].Count}
+    $override=Get-NativeOverride $settings.overrides ([string]$evt.item)
+    if($override -eq 'NOT VALUABLE'){return}
+    if($override -eq 'HIGH VALUE'){
+        if($settings.soundHigh){[void](Play-NativeAlert 'high' $settings.volume)}
+        return
+    }
+    if($uses -ge [int]$settings.threshold){
+        if($settings.soundHigh){[void](Play-NativeAlert 'high' $settings.volume)}
+    } elseif($uses -gt 0 -and $settings.soundAny){
+        [void](Play-NativeAlert 'research' $settings.volume)
+    }
 }
 function Read-SessionId {
     if(Test-Path -LiteralPath $sessionMetaPath){
@@ -186,11 +368,11 @@ function Update-ZoneContextFromLine([string]$line){
         }
     }
 }
-function Initialize-ZoneFromTail {
+function Read-ZoneTailBytes([int64]$requestedBytes) {
     if(-not $logPath -or -not(Test-Path -LiteralPath $logPath)){return}
     try{
         $fi=Get-Item -LiteralPath $logPath
-        $tailBytes=[Math]::Min([int64](16MB),[int64]$fi.Length)
+        $tailBytes=[Math]::Min([int64]$requestedBytes,[int64]$fi.Length)
         if($tailBytes -le 0){return}
         $fs=New-Object IO.FileStream($logPath,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
         try{
@@ -200,6 +382,12 @@ function Initialize-ZoneFromTail {
         }finally{$fs.Dispose()}
         foreach($line in ($text -split "`r?`n")){Update-CorpseRecoveryContextFromLine $line;Update-ZoneContextFromLine $line}
     }catch{}
+}
+function Initialize-ZoneFromTail {
+    # Most active logs have a zone transition in the last 2 MB. This keeps startup
+    # fast while retaining the prior 16 MB fallback for long quiet sessions.
+    Read-ZoneTailBytes (2MB)
+    if(-not $script:currentZone){Read-ZoneTailBytes (16MB)}
 }
 function Parse-LootLine([string]$line){
     if(-not $line){return $null}
@@ -288,6 +476,7 @@ function Read-NewLoot {
             $evt|Add-Member -NotePropertyName id -NotePropertyValue $nextId -Force
             $evt|Add-Member -NotePropertyName detectedAt -NotePropertyValue ((Get-Date).ToString("o")) -Force
             [void]$events.Add($evt)
+            Invoke-NativeLootAlert $evt
             $script:nextId++
         }
     }
@@ -306,12 +495,17 @@ function Write-JsonResponse($res,$obj,[int]$status=200){
     $res.OutputStream.Write($bytes,0,$bytes.Length)
 }
 
-Initialize-ZoneFromTail
-Reset-ToCurrentEnd
-
+# Open the local listener before heavier initialization so callers do not see
+# a connection-refused gap while the worker prepares zone and alert data.
 $listener=New-Object Net.HttpListener
 $listener.Prefixes.Add("http://127.0.0.1:8767/")
 $listener.Start()
+$listenerStartedAt=Get-Date
+
+$nativeResearchUseMap=Build-NativeResearchUseMap
+Initialize-ZoneFromTail
+Reset-ToCurrentEnd
+$workerReadyAt=Get-Date
 
 try{
     while($listener.IsListening){
@@ -328,6 +522,19 @@ try{
         $res=$ctx.Response
         try{
             if($req.HttpMethod -eq "OPTIONS"){$res.StatusCode=204;continue}
+            if($req.Url.AbsolutePath -eq "/api/native-sound-test"){
+                $kind=[string]$req.QueryString["kind"]
+                if(@('high','research','craftable') -notcontains $kind){$kind='research'}
+                $settings=Read-NativeAlertSettings
+                $played=Play-NativeAlert $kind ([double]$settings.volume)
+                Write-JsonResponse $res ([pscustomobject]@{ok=$true;played=[bool]$played;kind=$kind;volume=$settings.volume;native=$true}) 200
+                continue
+            }
+            if($req.Url.AbsolutePath -eq "/api/native-alert-status"){
+                $settings=Read-NativeAlertSettings
+                Write-JsonResponse $res ([pscustomobject]@{ok=$true;native=$true;ready=[bool]$workerReadyAt;researchItems=$nativeResearchUseMap.Count;enabled=$settings.enabled;classOnly=$settings.classOnly;volume=$settings.volume;startupMs=$(if($workerReadyAt){[int](($workerReadyAt-$workerStartedAt).TotalMilliseconds)}else{$null});lastKind=$nativeAlertLastKind;lastAt=$(if($nativeAlertLastAt){$nativeAlertLastAt.ToString('o')}else{$null})}) 200
+                continue
+            }
             if($req.Url.AbsolutePath -ne "/api/live-poll"){
                 Write-JsonResponse $res ([pscustomobject]@{ok=$false;error="Not found"}) 404
                 continue
@@ -355,6 +562,12 @@ try{
                 currentZoneVersion=$currentZoneVersion
                 currentZoneEnteredAt=$currentZoneEnteredAt
                 observedLootHistoryEnabled=($cfg.observedLootHistoryEnabled -ne $false)
+                nativeAlerts=$true
+                workerReady=[bool]$workerReadyAt
+                workerStartupMs=$(if($workerReadyAt){[int](($workerReadyAt-$workerStartedAt).TotalMilliseconds)}else{$null})
+                nativeResearchItems=$nativeResearchUseMap.Count
+                nativeAlertLastKind=$nativeAlertLastKind
+                nativeAlertLastAt=$(if($nativeAlertLastAt){$nativeAlertLastAt.ToString('o')}else{$null})
                 corpseRecoveryPending=[bool]$corpseRecoveryPending
                 corpseRecoveryActive=[bool]$corpseRecoveryActive
                 corpseRecoveryFirstLootSeen=[bool]$corpseRecoveryFirstLootSeen

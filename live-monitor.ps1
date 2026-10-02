@@ -988,28 +988,18 @@ try {
         }
     } catch { Write-UpdaterLog ("Backup retention warning: " + $_.Exception.Message) }
 
-    # Rebuild the normal desktop shortcut only for desktop mode.
+    # Refresh the persistent Desktop launcher only for Desktop mode.
+    # The shortcut points to a stable LocalAppData bootstrap, which reads install-root.txt.
     if(-not $portableMode){
-    try {
-        $desktop=[Environment]::GetFolderPath('Desktop')
-        $shortcutPath=Join-Path $desktop 'EverQuest Research & Loot Tool.lnk'
-        $vbs=Join-Path $Root 'EverQuest Research & Loot Tool.vbs'
-        $icon=Join-Path $Root 'EverQuestResearchLoot.ico'
-        $wscript=Join-Path $env:WINDIR 'System32\wscript.exe'
-        if(Test-Path -LiteralPath $shortcutPath){Remove-Item -LiteralPath $shortcutPath -Force -ErrorAction SilentlyContinue}
-        $ws=New-Object -ComObject WScript.Shell
-        $sc=$ws.CreateShortcut($shortcutPath)
-        $sc.TargetPath=$wscript
-        $sc.Arguments='"'+$vbs+'"'
-        $sc.WorkingDirectory=$env:TEMP
-        $sc.IconLocation=$icon+',0'
-        $sc.Description='Launch EverQuest Research & Loot Tool'
-        $sc.Save()
-        Set-Content -LiteralPath (Join-Path $userDataRoot 'install-root.txt') -Value $Root -Encoding UTF8
-        Write-UpdaterLog ("Desktop shortcut refreshed to: " + $vbs)
-    } catch {
-        Write-UpdaterLog ("Desktop shortcut refresh warning: " + $_.Exception.Message)
-    }
+        try {
+            $desktopSetup=Join-Path $Root 'INSTALL-DESKTOP-SHORTCUT.ps1'
+            if(-not(Test-Path -LiteralPath $desktopSetup)){throw "Updated Desktop setup script was not found."}
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -File $desktopSetup -NoPause -RefreshOnly | Out-Null
+            if($LASTEXITCODE -ne 0){throw "Desktop launcher refresh returned exit code $LASTEXITCODE."}
+            Write-UpdaterLog ("Persistent Desktop launcher refreshed for root: " + $Root)
+        } catch {
+            Write-UpdaterLog ("Desktop launcher refresh warning: " + $_.Exception.Message)
+        }
     }
 
     $vbs=Join-Path $Root $(if($portableMode){"EverQuest Research & Loot Tool Portable.vbs"}else{"EverQuest Research & Loot Tool.vbs"})
@@ -1428,7 +1418,7 @@ Start-LiveEventWorker
 
 $shutdownForUpdate=$false
 $listener=New-Object Net.HttpListener;$prefix="http://127.0.0.1:$port/";$listener.Prefixes.Add($prefix);$listener.Start()
-Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.17.3";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
+Write-Host "";Write-Host "EverQuest Research & Loot Tool v0.17.4";Write-Host "Open:     $prefix";Write-Host "";Write-Host "Keep this window open while playing. Press Ctrl+C to stop.";Write-Host ""
 
 try{
 while($listener.IsListening){

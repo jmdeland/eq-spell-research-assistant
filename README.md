@@ -1,12 +1,38 @@
-# What's New in v0.17.3
+# EverQuest Research & Loot Tool by Bromm
 
-- Adds **START HERE.bat** as the single easy entry point for Portable Mode, Desktop Mode, and setup checking.
-- Adds **Portable Mode** with persistent local data and no traditional installation requirement.
-- Adds safe **Portable ↔ Desktop** data migration with backups and Observed Loot History merging instead of overwrite.
-- Improves first-run EverQuest log detection so the actively written client log is preferred over stale installs.
-- Adds persistent player loot-value overrides: Default, High Value, Keep, and Not Valuable.
-- Improves Bastion corpse-recovery detection for in-zone resurrection sequences that do not emit a new zone-entry line.
-- Preserves two-character Magelo, Shared Bank deduplication, session recovery, permanent Observed Loot History, and the dedicated worker architecture.
+## v0.17.4 — Stable Final Polish Release
+
+v0.17.4 is the long-lived stable release built from the fully tested v0.17.4-demo.5 release candidate.
+
+This release completes the reliability and usability polish pass without adding a new feature family. It keeps the accepted Live Loot, Research, Magelo, history, session, portable, and desktop behavior while closing the remaining startup, audio, launcher, and presentation issues found during final testing.
+
+### Final polish included in v0.17.4
+
+- Native Windows-side High Value and Research alert audio so alerts remain immediate while EverQuest is in the foreground or the browser tab is not selected.
+- Live Event Worker startup-readiness improvements, including a faster initial zone scan, an earlier listener, and readiness/startup diagnostics.
+- Persistent Desktop launcher under LocalAppData so an older extracted copy cannot silently reclaim the desktop shortcut.
+- Fixed Desktop launcher path encoding for Windows PowerShell 5.1.
+- Version-specific shortcut icon caching to reduce stale Windows icon behavior.
+- **Orphaned tray self-recovery:** if the tray process survives while the monitor on port 8765 dies, a later desktop launch safely identifies and clears only the verified stale `research-tool-tray.ps1` process instead of silently failing.
+- Safe Portable ↔ Desktop migration with backups and merge-safe Observed Loot History handling.
+- Improved active EverQuest log selection so stale client installations are not preferred over the log currently being written.
+- Persistent player loot-value overrides.
+- Improved Bastion corpse-recovery detection.
+- Two-character Magelo support with Shared Bank deduplication.
+- Dedicated Live Event, persistence, and history-index worker architecture retained.
+
+### Live Loot presentation polish
+
+The currently selected ownership mode in the Live Loot Monitor is now deliberately high-contrast:
+
+- **Group/personal mode**
+- **Raid/observation mode**
+
+The active mode label is white/high-contrast, bold, and underlined so it stands out from the explanatory text.
+
+### Stable baseline
+
+This build is intended to remain the stable baseline until a future feature is intentionally started. Future feature work should begin on a new demo version rather than altering the stable release in place.
 
 ---
 
@@ -313,7 +339,7 @@ Updating is optional. Older installed versions do not expire just because a newe
 
 ![Item Lookup](docs/images/RALM4.jpg)
 
-## Export
+## Settings
 
 ![Settings](docs/images/RALM5.jpg)
 
@@ -328,7 +354,7 @@ Updating is optional. Older installed versions do not expire just because a newe
 
 ## Portable Mode — No Installation Required
 
-For users who want to try the tool without setting up a desktop shortcut, v0.17.2-demo.5 adds a true portable launch option.
+For users who want to try the tool without setting up a desktop shortcut, the current release includes a true portable launch option.
 
 1. Download and extract the ZIP.
 2. Double-click `RUN-PORTABLE.bat`.
@@ -438,15 +464,15 @@ Stable releases are published through GitHub Releases.
 
 
 
-# What's New in v0.17.3
+# What's New in v0.17.4
 
-- One-file `START HERE.bat` onboarding for Portable or Desktop use.
-- Persistent Portable Mode plus safe two-way migration between Portable and Desktop data.
-- Backups and merge-safe Observed Loot History migration.
-- Active-client log selection that prefers recently written EQ logs.
-- Player-controlled loot-value overrides.
-- Improved in-zone corpse-recovery detection.
-- Existing Live Loot, Magelo, Research, session, history, and worker architecture retained.
+- Native Windows-side loot alert audio for immediate alerts even while EverQuest or another tab has focus.
+- Faster, observable Live Event Worker startup with `STARTING` / readiness diagnostics.
+- Persistent LocalAppData desktop launcher and corrected PowerShell 5.1 path encoding.
+- Version-specific desktop shortcut icon cache.
+- Safe Portable/Desktop history migration and recovery protections retained.
+- Active-client EQ log selection, two-character Magelo, value overrides, corpse recovery, session persistence, and Observed History retained.
+- Active Live Loot ownership mode label is now bolded for faster visual confirmation.
 
 # Project
 
@@ -458,12 +484,6 @@ https://github.com/jmdeland/eq-spell-research-assistant
 Latest stable release:  
 https://github.com/jmdeland/eq-spell-research-assistant/releases/latest
 
-
-# v0.17.3
-
-## Portable, Onboarding, and Migration Improvements
-
-This demo hardens the portable-to-desktop transition. Before importing portable data, the desktop setup now creates a timestamped backup of existing Desktop data. Monthly Observed Loot History JSONL archives are merged by unique `historyId` instead of replaced, the derived history index is rebuilt from raw archives, and the portable source remains untouched. The installer reports record counts and duplicates so the migration is auditable.
 
 
 # v0.17.2-demo.5

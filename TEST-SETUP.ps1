@@ -27,5 +27,21 @@ if($online){
  $live=$false;try{$p=Invoke-RestMethod 'http://127.0.0.1:8767/api/live-poll?after=0' -TimeoutSec 2;$live=($null -ne $p)}catch{};Result 'Live Loot worker' $live $(if($live){'Live worker responded.'}else{'Live worker did not respond.'})
  $persist=$false;try{$p=Invoke-RestMethod 'http://127.0.0.1:8766/api/persistence-health' -TimeoutSec 2;$persist=($p.ok -eq $true)}catch{};Result 'Persistence worker' $persist $(if($persist){'Session/history persistence responded.'}else{'Persistence worker did not respond.'})
 }
+
+
+# Desktop launcher consistency check.
+try{
+    $desktopData=Join-Path $env:LOCALAPPDATA 'EverQuest Research & Loot Tool'
+    $installRootFile=Join-Path $desktopData 'install-root.txt'
+    $desktopShortcut=Join-Path ([Environment]::GetFolderPath('Desktop')) 'EverQuest Research & Loot Tool.lnk'
+    $persistentLauncher=Join-Path $desktopData 'EverQuest Research & Loot Tool Launcher.vbs'
+    $savedRoot=''
+    if(Test-Path -LiteralPath $installRootFile){$savedRoot=(Get-Content -LiteralPath $installRootFile -First 1).Trim()}
+    $rootOk=($savedRoot -and (Test-Path -LiteralPath (Join-Path $savedRoot 'app-version.json')))
+    Result 'Desktop app location' $rootOk $(if($rootOk){$savedRoot}else{'Desktop location is missing or stale. Run START HERE.bat -> Desktop Mode to repair it.'})
+    $shortcutOk=(Test-Path -LiteralPath $desktopShortcut) -and (Test-Path -LiteralPath $persistentLauncher)
+    Result 'Desktop shortcut' $shortcutOk $(if($shortcutOk){'Persistent desktop launcher is installed.'}else{'Run START HERE.bat -> Desktop Mode to create/repair it.'})
+}catch{}
+
 Write-Host ''
 Read-Host 'Press Enter to return to Easy Start'

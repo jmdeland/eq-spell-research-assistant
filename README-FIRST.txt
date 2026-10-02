@@ -25,4 +25,4 @@ EverQuest log:
 Need help?
 Run START HERE.bat and choose 3 - Check / Repair Setup.
 
-Stable release: v0.17.3
+Stable release: v0.17.4

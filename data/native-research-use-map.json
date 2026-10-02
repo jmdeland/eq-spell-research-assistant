@@ -1,0 +1,2188 @@
+{
+  "schema": 1,
+  "generatedFrom": [
+    "bastion-synced-recipes.json",
+    "bastion-recipes.json"
+  ],
+  "items": {
+    "amber": [
+      "913",
+      "914",
+      "915",
+      "916",
+      "917",
+      "918"
+    ],
+    "bat fur": [
+      "551"
+    ],
+    "bat wing": [
+      "578"
+    ],
+    "bixie wing": [
+      "508"
+    ],
+    "blood of velious": [
+      "802"
+    ],
+    "bloodstone": [
+      "10250",
+      "924"
+    ],
+    "bolts of tallon": [
+      "623",
+      "691",
+      "778",
+      "833",
+      "846"
+    ],
+    "bone chips": [
+      "578"
+    ],
+    "breath of ro": [
+      "521",
+      "650",
+      "718"
+    ],
+    "breath of solusek": [
+      "723",
+      "796"
+    ],
+    "brownie parts": [
+      "572"
+    ],
+    "burned out lightstone": [
+      "552",
+      "553",
+      "554",
+      "555",
+      "556",
+      "557",
+      "558",
+      "559",
+      "560",
+      "561",
+      "562",
+      "563",
+      "564",
+      "565",
+      "566",
+      "567",
+      "568",
+      "569"
+    ],
+    "card of bristlebane": [
+      "10254",
+      "603",
+      "630",
+      "779",
+      "789",
+      "866",
+      "legacy:CLR:aegolism"
+    ],
+    "cat`s eye agate": [
+      "509",
+      "510",
+      "511",
+      "512",
+      "513",
+      "514",
+      "515",
+      "516"
+    ],
+    "celestial essence": [
+      "10959",
+      "10960",
+      "10961",
+      "10962"
+    ],
+    "coin of xev": [
+      "712",
+      "713",
+      "788",
+      "800",
+      "818",
+      "865"
+    ],
+    "dagger": [
+      "658"
+    ],
+    "dew clover": [
+      "1008729",
+      "10262",
+      "526",
+      "683",
+      "691",
+      "705",
+      "789",
+      "790",
+      "801",
+      "824",
+      "864",
+      "869",
+      "890",
+      "903"
+    ],
+    "emerald": [
+      "10960"
+    ],
+    "empty vial": [
+      "1018190"
+    ],
+    "essence of rathe": [
+      "598",
+      "649"
+    ],
+    "etched signet": [
+      "602",
+      "624",
+      "628",
+      "759",
+      "848",
+      "871",
+      "887",
+      "889",
+      "892"
+    ],
+    "eye of serilis": [
+      "852"
+    ],
+    "faded salil`s writ page": [
+      "594",
+      "596",
+      "597"
+    ],
+    "faded velishoul`s tome page": [
+      "944",
+      "945"
+    ],
+    "faerie wing": [
+      "529"
+    ],
+    "fine steel great staff": [
+      "10176"
+    ],
+    "fine steel jutte": [
+      "10177"
+    ],
+    "fine steel katana": [
+      "10160"
+    ],
+    "fine steel kusarigama": [
+      "10161"
+    ],
+    "fine steel long sword": [
+      "10150"
+    ],
+    "fine steel morning star": [
+      "10175"
+    ],
+    "fine steel naginata": [
+      "10162"
+    ],
+    "fine steel scimitar": [
+      "10153"
+    ],
+    "fine steel short sword": [
+      "10152"
+    ],
+    "fine steel tachi": [
+      "10163"
+    ],
+    "fine steel two handed sword": [
+      "10151"
+    ],
+    "fine steel wakizashi": [
+      "10159"
+    ],
+    "fine steel warhammer": [
+      "10174"
+    ],
+    "fire beetle eye": [
+      "579",
+      "580",
+      "581",
+      "582",
+      "583",
+      "584",
+      "585",
+      "586",
+      "587",
+      "588",
+      "589"
+    ],
+    "fire drake scale": [
+      "529"
+    ],
+    "flake of lodestone": [
+      "571",
+      "641",
+      "685",
+      "729",
+      "749",
+      "785",
+      "799",
+      "814",
+      "831",
+      "841",
+      "847",
+      "850",
+      "946"
+    ],
+    "flame of fennin": [
+      "602",
+      "631",
+      "704",
+      "821",
+      "841"
+    ],
+    "flame of vox": [
+      "724",
+      "764"
+    ],
+    "froglok eye": [
+      "508"
+    ],
+    "giant bat wing": [
+      "913"
+    ],
+    "giant fire beetle eye": [
+      "10150",
+      "10151",
+      "10152",
+      "10153",
+      "10157",
+      "10159",
+      "10160",
+      "10161",
+      "10162",
+      "10163"
+    ],
+    "giant scarab eye": [
+      "913"
+    ],
+    "giant snake fang": [
+      "914",
+      "915",
+      "916",
+      "917",
+      "918"
+    ],
+    "giant snake rattle": [
+      "530",
+      "531",
+      "532",
+      "533",
+      "534",
+      "535",
+      "536",
+      "537",
+      "538",
+      "539",
+      "540",
+      "541",
+      "542",
+      "543",
+      "544",
+      "545",
+      "546",
+      "547"
+    ],
+    "glove of rallos zek": [
+      "722",
+      "763",
+      "857"
+    ],
+    "griffon feathers": [
+      "10149"
+    ],
+    "hematite": [
+      "508"
+    ],
+    "hill giant toes": [
+      "10174",
+      "10175",
+      "10176",
+      "10177"
+    ],
+    "ice of velious": [
+      "1018182",
+      "768",
+      "859"
+    ],
+    "jade": [
+      "529",
+      "530",
+      "531",
+      "532",
+      "533",
+      "534",
+      "535",
+      "536",
+      "537",
+      "538",
+      "539",
+      "540",
+      "541",
+      "542",
+      "543",
+      "544",
+      "545",
+      "546",
+      "547"
+    ],
+    "jade shard": [
+      "767",
+      "858"
+    ],
+    "jasper": [
+      "551"
+    ],
+    "lapis lazuli": [
+      "578"
+    ],
+    "large raw-hide belt": [
+      "564"
+    ],
+    "large raw-hide boots": [
+      "569"
+    ],
+    "large raw-hide cloak": [
+      "942"
+    ],
+    "large raw-hide gloves": [
+      "567"
+    ],
+    "large raw-hide gorget": [
+      "939"
+    ],
+    "large raw-hide leggings": [
+      "568"
+    ],
+    "large raw-hide mask": [
+      "938"
+    ],
+    "large raw-hide shoulderpads": [
+      "941"
+    ],
+    "large raw-hide skullcap": [
+      "937"
+    ],
+    "large raw-hide sleeves": [
+      "565"
+    ],
+    "large raw-hide tunic": [
+      "940"
+    ],
+    "large raw-hide wristbands": [
+      "566"
+    ],
+    "large ringmail belt": [
+      "542"
+    ],
+    "large ringmail boots": [
+      "547"
+    ],
+    "large ringmail bracelet": [
+      "544"
+    ],
+    "large ringmail gloves": [
+      "545"
+    ],
+    "large ringmail pants": [
+      "546"
+    ],
+    "large ringmail sleeves": [
+      "543"
+    ],
+    "large snake rattle": [
+      "509",
+      "510",
+      "511",
+      "512",
+      "513",
+      "514",
+      "515",
+      "516"
+    ],
+    "loaf of bread": [
+      "654"
+    ],
+    "mist of povar": [
+      "634",
+      "815",
+      "855",
+      "892",
+      "895"
+    ],
+    "nilitim`s grimoire pg. 115": [
+      "524",
+      "644"
+    ],
+    "nilitim`s grimoire pg. 116": [
+      "644"
+    ],
+    "nilitim`s grimoire pg. 300": [
+      "840"
+    ],
+    "nilitim`s grimoire pg. 301": [
+      "840"
+    ],
+    "nilitim`s grimoire pg. 35": [
+      "807"
+    ],
+    "nilitim`s grimoire pg. 351": [
+      "690"
+    ],
+    "nilitim`s grimoire pg. 352": [
+      "690"
+    ],
+    "nilitim`s grimoire pg. 36": [
+      "807"
+    ],
+    "nilitim`s grimoire pg. 378": [
+      "604"
+    ],
+    "nilitim`s grimoire pg. 379": [
+      "604"
+    ],
+    "nilitim`s grimoire pg. 400": [
+      "804"
+    ],
+    "nilitim`s grimoire pg. 401": [
+      "804"
+    ],
+    "nilitim`s grimoire pg. 415": [
+      "622"
+    ],
+    "nilitim`s grimoire pg. 416": [
+      "622"
+    ],
+    "nilitim`s grimoire pg. 449": [
+      "827"
+    ],
+    "nilitim`s grimoire pg. 450": [
+      "827"
+    ],
+    "onyx": [
+      "925",
+      "926",
+      "927",
+      "928",
+      "929",
+      "930",
+      "931",
+      "932",
+      "933",
+      "934",
+      "935",
+      "936",
+      "937",
+      "938",
+      "939",
+      "940",
+      "941",
+      "942"
+    ],
+    "part of finnok`s treatise pg. 2": [
+      "728",
+      "729",
+      "730",
+      "847",
+      "912"
+    ],
+    "part of keris` dissertation pg. 5": [
+      "10258",
+      "10261"
+    ],
+    "part of keris` dissertation pg. 7": [
+      "740"
+    ],
+    "part of tasarin`s grimoire pg. 23": [
+      "770"
+    ],
+    "part of tasarin`s grimoire pg. 24": [
+      "670"
+    ],
+    "part of tasarin`s grimoire pg. 26": [
+      "791"
+    ],
+    "part of tasarin`s grimoire pg. 30": [
+      "621"
+    ],
+    "part of tasarin`s grimoire pg. 312": [
+      "643"
+    ],
+    "part of tasarin`s grimoire pg. 375": [
+      "677"
+    ],
+    "part of tasarin`s grimoire pg. 390": [
+      "849"
+    ],
+    "part of toharon`s memoir pg. 15": [
+      "899",
+      "909",
+      "920"
+    ],
+    "part of toharon`s memoir pg. 18": [
+      "1008723",
+      "1008724",
+      "1008726",
+      "661",
+      "786"
+    ],
+    "part of toharon`s memoir pg. 21": [
+      "672",
+      "704",
+      "733",
+      "817",
+      "900",
+      "910"
+    ],
+    "part of yaeth`s compendium pg. 102": [
+      "711",
+      "801"
+    ],
+    "part of yaeth`s compendium pg. 104": [
+      "608",
+      "698"
+    ],
+    "part of yaeth`s compendium pg. 107": [
+      "709",
+      "882"
+    ],
+    "part of yaeth`s compendium pg. 112": [
+      "612",
+      "669"
+    ],
+    "part of yaeth`s compendium pg. 114": [
+      "683",
+      "759",
+      "894",
+      "902"
+    ],
+    "part of yaeth`s compendium pg. 117": [
+      "790",
+      "844"
+    ],
+    "part of yaeth`s compendium pg. 118": [
+      "790",
+      "844",
+      "882"
+    ],
+    "part of yaeth`s compendium pg. 25": [
+      "10257",
+      "684",
+      "760"
+    ],
+    "part of yaeth`s compendium pg. 26": [
+      "624",
+      "760"
+    ],
+    "part of yaeth`s compendium pg. 50": [
+      "688",
+      "701",
+      "744",
+      "848",
+      "868"
+    ],
+    "part of yaeth`s compendium pg. 61": [
+      "746",
+      "867",
+      "876"
+    ],
+    "part of yaeth`s compendium pg. 63": [
+      "1008914",
+      "636",
+      "713"
+    ],
+    "part of yaeth`s compendium pg. 65": [
+      "702",
+      "772",
+      "870"
+    ],
+    "part of yaeth`s compendium pg. 70": [
+      "1008729",
+      "1008930",
+      "606",
+      "889",
+      "906"
+    ],
+    "part of yaeth`s compendium pg. 72": [
+      "710",
+      "898",
+      "903"
+    ],
+    "part of yaeth`s compendium pg. 73": [
+      "518",
+      "815",
+      "825",
+      "871",
+      "881"
+    ],
+    "part of yaeth`s compendium pg. 78": [
+      "685",
+      "734",
+      "823",
+      "824",
+      "866",
+      "947"
+    ],
+    "part of yaeth`s compendium pg. 80": [
+      "10262",
+      "610",
+      "655"
+    ],
+    "part of yaeth`s compendium pg. 82": [
+      "680",
+      "843",
+      "864"
+    ],
+    "part of yaeth`s compendium pg. 91": [
+      "700",
+      "869"
+    ],
+    "part of yaeth`s compendium pg. 94": [
+      "620",
+      "703",
+      "846"
+    ],
+    "part of yaeth`s compendium pg. 97": [
+      "714"
+    ],
+    "part of zeannor`s thesis pg. 12": [
+      "665"
+    ],
+    "part of zeannor`s thesis pg. 14": [
+      "10080",
+      "696"
+    ],
+    "part of zeannor`s thesis pg. 15": [
+      "666"
+    ],
+    "pearl": [
+      "10149",
+      "10150",
+      "10151",
+      "10152",
+      "10153",
+      "10157",
+      "10159",
+      "10160",
+      "10161",
+      "10162",
+      "10163"
+    ],
+    "pearl shard": [
+      "765",
+      "856"
+    ],
+    "peridot": [
+      "10959"
+    ],
+    "pixie wing": [
+      "551"
+    ],
+    "poison vial": [
+      "10959",
+      "10960",
+      "10961",
+      "10962"
+    ],
+    "primordial substance": [
+      "1008723",
+      "10254",
+      "606",
+      "614",
+      "642",
+      "702",
+      "778",
+      "855"
+    ],
+    "raw-hide belt": [
+      "558"
+    ],
+    "raw-hide boots": [
+      "563"
+    ],
+    "raw-hide cloak": [
+      "936"
+    ],
+    "raw-hide gloves": [
+      "561"
+    ],
+    "raw-hide gorget": [
+      "933"
+    ],
+    "raw-hide leggings": [
+      "562"
+    ],
+    "raw-hide mask": [
+      "932"
+    ],
+    "raw-hide shoulderpads": [
+      "935"
+    ],
+    "raw-hide skullcap": [
+      "931"
+    ],
+    "raw-hide sleeves": [
+      "559"
+    ],
+    "raw-hide tunic": [
+      "934"
+    ],
+    "raw-hide wristbands": [
+      "560"
+    ],
+    "ringmail boots": [
+      "535"
+    ],
+    "ringmail bracelet": [
+      "532"
+    ],
+    "ringmail cape": [
+      "918"
+    ],
+    "ringmail coat": [
+      "916"
+    ],
+    "ringmail coif": [
+      "914"
+    ],
+    "ringmail gloves": [
+      "533"
+    ],
+    "ringmail mantle": [
+      "917"
+    ],
+    "ringmail neckguard": [
+      "915"
+    ],
+    "ringmail pants": [
+      "534"
+    ],
+    "ringmail skirt": [
+      "530"
+    ],
+    "ringmail sleeves": [
+      "531"
+    ],
+    "ruby": [
+      "10962"
+    ],
+    "rune of al`kabor": [
+      "694",
+      "699",
+      "842"
+    ],
+    "rune of alternation": [
+      "1008721",
+      "601",
+      "628",
+      "787",
+      "811",
+      "822",
+      "880"
+    ],
+    "rune of amalgamation": [
+      "675",
+      "682",
+      "720",
+      "745",
+      "861",
+      "883",
+      "890"
+    ],
+    "rune of antithesis": [
+      "671",
+      "743",
+      "893"
+    ],
+    "rune of ap`sagor": [
+      "907"
+    ],
+    "rune of arrest": [
+      "12994"
+    ],
+    "rune of association": [
+      "682",
+      "686",
+      "692",
+      "697",
+      "720"
+    ],
+    "rune of attraction": [
+      "13325",
+      "716",
+      "771"
+    ],
+    "rune of banding": [
+      "639"
+    ],
+    "rune of cascade": [
+      "27828",
+      "695",
+      "745"
+    ],
+    "rune of coalition": [
+      "634",
+      "692",
+      "787",
+      "860"
+    ],
+    "rune of complexity": [
+      "663",
+      "683",
+      "695",
+      "845"
+    ],
+    "rune of conception": [
+      "646",
+      "878"
+    ],
+    "rune of concussion": [
+      "525",
+      "639",
+      "761",
+      "907"
+    ],
+    "rune of conglomeration": [
+      "1008722",
+      "1008933",
+      "609",
+      "618",
+      "627",
+      "695",
+      "902"
+    ],
+    "rune of conjunction": [
+      "686",
+      "720",
+      "809",
+      "812"
+    ],
+    "rune of consumption": [
+      "12994"
+    ],
+    "rune of contortion": [
+      "878"
+    ],
+    "rune of contradiction": [
+      "618",
+      "845",
+      "851"
+    ],
+    "rune of coruscating": [
+      "708",
+      "799",
+      "831",
+      "861"
+    ],
+    "rune of crippling": [
+      "806"
+    ],
+    "rune of current": [
+      "1008933",
+      "754",
+      "777",
+      "872"
+    ],
+    "rune of disassociation": [
+      "637"
+    ],
+    "rune of dismemberment": [
+      "884"
+    ],
+    "rune of divergency": [
+      "616",
+      "636",
+      "737",
+      "809",
+      "868",
+      "898"
+    ],
+    "rune of draught": [
+      "642",
+      "673",
+      "705"
+    ],
+    "rune of druzzil": [
+      "872"
+    ],
+    "rune of ellipse": [
+      "527",
+      "600",
+      "641",
+      "708",
+      "747",
+      "758",
+      "812",
+      "830",
+      "893"
+    ],
+    "rune of embrace": [
+      "646"
+    ],
+    "rune of expulsion": [
+      "771"
+    ],
+    "rune of falhalem": [
+      "739"
+    ],
+    "rune of fennin ro": [
+      "697",
+      "809"
+    ],
+    "rune of flash": [
+      "27828",
+      "696",
+      "747",
+      "799",
+      "831",
+      "910"
+    ],
+    "rune of frost": [
+      "10071",
+      "1018182",
+      "13114"
+    ],
+    "rune of fulguration": [
+      "13109",
+      "678",
+      "816"
+    ],
+    "rune of gale": [
+      "625",
+      "728",
+      "737",
+      "786",
+      "810",
+      "811",
+      "873"
+    ],
+    "rune of glint": [
+      "27828",
+      "673",
+      "679",
+      "708",
+      "861"
+    ],
+    "rune of howling": [
+      "878"
+    ],
+    "rune of impetus": [
+      "1008793",
+      "13328",
+      "862"
+    ],
+    "rune of impulse": [
+      "27828",
+      "549",
+      "784",
+      "875",
+      "885",
+      "901",
+      "Impulse Runed Swatch"
+    ],
+    "rune of incendiary": [
+      "609",
+      "663",
+      "697",
+      "762",
+      "886"
+    ],
+    "rune of incitation": [
+      "671",
+      "696",
+      "777",
+      "784",
+      "893",
+      "946"
+    ],
+    "rune of incitement": [
+      "671",
+      "784",
+      "845",
+      "897",
+      "909"
+    ],
+    "rune of infraction": [
+      "699"
+    ],
+    "rune of karana": [
+      "13109",
+      "678",
+      "776"
+    ],
+    "rune of nagafen": [
+      "808"
+    ],
+    "rune of neglect": [
+      "751"
+    ],
+    "rune of opposition": [
+      "754",
+      "851",
+      "901",
+      "946"
+    ],
+    "rune of oppression": [
+      "751"
+    ],
+    "rune of paralysis": [
+      "742"
+    ],
+    "rune of periphery": [
+      "816"
+    ],
+    "rune of petrification": [
+      "742"
+    ],
+    "rune of presence": [
+      "637"
+    ],
+    "rune of prexus": [
+      "737",
+      "810",
+      "873"
+    ],
+    "rune of proximity": [
+      "808"
+    ],
+    "rune of rallos zek": [
+      "842"
+    ],
+    "rune of rathe": [
+      "13325",
+      "716",
+      "806"
+    ],
+    "rune of regeneration": [
+      "884"
+    ],
+    "rune of scintillation": [
+      "708"
+    ],
+    "rune of solusek ro": [
+      "761"
+    ],
+    "rune of sorcery": [
+      "1008790",
+      "12994",
+      "599"
+    ],
+    "rune of substance": [
+      "739"
+    ],
+    "rune of synergy": [
+      "27828",
+      "679",
+      "746",
+      "777"
+    ],
+    "rune of tallon zek": [
+      "692"
+    ],
+    "rune of tempest": [
+      "1008722",
+      "27828",
+      "675",
+      "705",
+      "754",
+      "830",
+      "873",
+      "901",
+      "922"
+    ],
+    "rune of the astral": [
+      "10071",
+      "13114",
+      "13328",
+      "519",
+      "862"
+    ],
+    "rune of the catalyst": [
+      "639"
+    ],
+    "rune of the combine": [
+      "1008789",
+      "646",
+      "884"
+    ],
+    "rune of the cyclone": [
+      "10146",
+      "761"
+    ],
+    "rune of the helix": [
+      "1008791",
+      "699",
+      "842"
+    ],
+    "rune of the inverse": [
+      "1008792",
+      "13325",
+      "550",
+      "716"
+    ],
+    "rune of transpose": [
+      "663",
+      "686",
+      "850",
+      "885",
+      "886"
+    ],
+    "rune of trauma": [
+      "645"
+    ],
+    "rune of tyranny": [
+      "742"
+    ],
+    "rune of velious": [
+      "694"
+    ],
+    "rune of vortex": [
+      "27828",
+      "675",
+      "830",
+      "880"
+    ],
+    "rune of xegony": [
+      "13109",
+      "645",
+      "678",
+      "776"
+    ],
+    "rune of zephyr": [
+      "675",
+      "788",
+      "790"
+    ],
+    "runed emblem": [
+      "10255",
+      "603",
+      "625",
+      "788",
+      "817",
+      "823",
+      "868",
+      "898",
+      "legacy:CLR:aegolism"
+    ],
+    "rusty axe": [
+      "584"
+    ],
+    "rusty bastard sword": [
+      "586"
+    ],
+    "rusty battle axe": [
+      "583"
+    ],
+    "rusty broad sword": [
+      "587"
+    ],
+    "rusty dagger": [
+      "510"
+    ],
+    "rusty flail": [
+      "511"
+    ],
+    "rusty halberd": [
+      "588"
+    ],
+    "rusty long sword": [
+      "579"
+    ],
+    "rusty mace": [
+      "509"
+    ],
+    "rusty morning star": [
+      "512"
+    ],
+    "rusty rapier": [
+      "513"
+    ],
+    "rusty scimitar": [
+      "589"
+    ],
+    "rusty scythe": [
+      "581"
+    ],
+    "rusty short sword": [
+      "580"
+    ],
+    "rusty shortened spear": [
+      "516"
+    ],
+    "rusty spear": [
+      "514"
+    ],
+    "rusty two handed battle axe": [
+      "585"
+    ],
+    "rusty two handed hammer": [
+      "515"
+    ],
+    "rusty two handed sword": [
+      "582"
+    ],
+    "salil`s writ pg. 153": [
+      "828"
+    ],
+    "salil`s writ pg. 174": [
+      "715"
+    ],
+    "salil`s writ pg. 282": [
+      "741"
+    ],
+    "salil`s writ pg. 288": [
+      "792"
+    ],
+    "salil`s writ pg. 60": [
+      "750"
+    ],
+    "salil`s writ pg. 64": [
+      "591",
+      "820"
+    ],
+    "salil`s writ pg. 90": [
+      "573",
+      "783"
+    ],
+    "sapphire": [
+      "10961"
+    ],
+    "scales of veeshan": [
+      "762",
+      "785",
+      "908"
+    ],
+    "shark skin": [
+      "10251",
+      "572"
+    ],
+    "sliver of moonstone": [
+      "674",
+      "688",
+      "779",
+      "822",
+      "897"
+    ],
+    "small brick of ore": [
+      "797"
+    ],
+    "small raw-hide belt": [
+      "552"
+    ],
+    "small raw-hide boots": [
+      "557"
+    ],
+    "small raw-hide cloak": [
+      "930"
+    ],
+    "small raw-hide gloves": [
+      "555"
+    ],
+    "small raw-hide gorget": [
+      "927"
+    ],
+    "small raw-hide leggings": [
+      "556"
+    ],
+    "small raw-hide mask": [
+      "926"
+    ],
+    "small raw-hide shoulderpads": [
+      "929"
+    ],
+    "small raw-hide skullcap": [
+      "925"
+    ],
+    "small raw-hide sleeves": [
+      "553"
+    ],
+    "small raw-hide tunic": [
+      "928"
+    ],
+    "small raw-hide wristbands": [
+      "554"
+    ],
+    "small ringmail belt": [
+      "536"
+    ],
+    "small ringmail boots": [
+      "541"
+    ],
+    "small ringmail bracelet": [
+      "538"
+    ],
+    "small ringmail gloves": [
+      "539"
+    ],
+    "small ringmail pants": [
+      "540"
+    ],
+    "small ringmail sleeves": [
+      "537"
+    ],
+    "spell: allure": [
+      "1008786"
+    ],
+    "spell: atol`s spectral shackles": [
+      "1008788"
+    ],
+    "spell: bond of death": [
+      "1008786"
+    ],
+    "spell: cancel magic": [
+      "802"
+    ],
+    "spell: conjuration: air": [
+      "717"
+    ],
+    "spell: conjuration: fire": [
+      "718"
+    ],
+    "spell: conjuration: water": [
+      "719"
+    ],
+    "spell: elemental: air": [
+      "10253",
+      "13329"
+    ],
+    "spell: elemental: earth": [
+      "797"
+    ],
+    "spell: elemental: fire": [
+      "10252"
+    ],
+    "spell: elemental: water": [
+      "10251"
+    ],
+    "spell: enticement of flame": [
+      "1008785"
+    ],
+    "spell: gift of xev": [
+      "1008788"
+    ],
+    "spell: greater conjuration: fire": [
+      "1008786"
+    ],
+    "spell: greater summoning: air": [
+      "795"
+    ],
+    "spell: greater summoning: fire": [
+      "796"
+    ],
+    "spell: improved invis vs undead": [
+      "1008787"
+    ],
+    "spell: improved invisibility": [
+      "1008787"
+    ],
+    "spell: lesser conjuration: air": [
+      "648"
+    ],
+    "spell: lesser conjuration: earth": [
+      "1008784",
+      "649"
+    ],
+    "spell: lesser conjuration: fire": [
+      "650"
+    ],
+    "spell: lesser conjuration: water": [
+      "651"
+    ],
+    "spell: lesser summoning: air": [
+      "856"
+    ],
+    "spell: lesser summoning: earth": [
+      "857"
+    ],
+    "spell: lesser summoning: fire": [
+      "858"
+    ],
+    "spell: lesser summoning: water": [
+      "859"
+    ],
+    "spell: minor conjuration: earth": [
+      "763"
+    ],
+    "spell: minor conjuration: water": [
+      "764"
+    ],
+    "spell: minor summoning: air": [
+      "765"
+    ],
+    "spell: minor summoning: earth": [
+      "766"
+    ],
+    "spell: minor summoning: fire": [
+      "767"
+    ],
+    "spell: minor summoning: water": [
+      "768"
+    ],
+    "spell: monster summoning ii": [
+      "1008787"
+    ],
+    "spell: splurt": [
+      "1008788"
+    ],
+    "spell: summon drink": [
+      "687"
+    ],
+    "spell: summon food": [
+      "654"
+    ],
+    "spell: summon heatstone": [
+      "852"
+    ],
+    "spell: summoning: air": [
+      "721"
+    ],
+    "spell: summoning: earth": [
+      "722"
+    ],
+    "spell: summoning: fire": [
+      "723"
+    ],
+    "spell: summoning: water": [
+      "724"
+    ],
+    "spell: theft of thought": [
+      "1008788"
+    ],
+    "spell: translocate": [
+      "1008787"
+    ],
+    "spell: wrath of al`kabor": [
+      "1008786"
+    ],
+    "spiderling silk": [
+      "925",
+      "926",
+      "927",
+      "928",
+      "929",
+      "930",
+      "931",
+      "932",
+      "933",
+      "934",
+      "935",
+      "936",
+      "937",
+      "938",
+      "939",
+      "940",
+      "941",
+      "942"
+    ],
+    "staff shard of luclin": [
+      "613",
+      "635",
+      "674",
+      "701",
+      "728",
+      "729",
+      "730",
+      "733",
+      "781"
+    ],
+    "star rose quartz": [
+      "552",
+      "553",
+      "554",
+      "555",
+      "556",
+      "557",
+      "558",
+      "559",
+      "560",
+      "561",
+      "562",
+      "563",
+      "564",
+      "565",
+      "566",
+      "567",
+      "568",
+      "569",
+      "854"
+    ],
+    "tears of prexus": [
+      "651",
+      "719",
+      "921"
+    ],
+    "the scent of marr": [
+      "648",
+      "721",
+      "795"
+    ],
+    "toharon`s memoir pg. 22": [
+      "1008724",
+      "603",
+      "672",
+      "817",
+      "900",
+      "legacy:CLR:aegolism"
+    ],
+    "topaz": [
+      "10174",
+      "10175",
+      "10176",
+      "10177",
+      "572",
+      "766"
+    ],
+    "turquoise": [
+      "579",
+      "580",
+      "581",
+      "582",
+      "583",
+      "584",
+      "585",
+      "586",
+      "587",
+      "588",
+      "589"
+    ],
+    "undead froglok tongue": [
+      "10149"
+    ],
+    "velishoul`s tome pg. 108": [
+      "693"
+    ],
+    "velishoul`s tome pg. 109": [
+      "693"
+    ],
+    "velishoul`s tome pg. 8": [
+      "874"
+    ],
+    "velishoul`s tome pg. 9": [
+      "874"
+    ],
+    "velishoul`s tome pg.16": [
+      "12998"
+    ],
+    "velishoul`s tome pg.17": [
+      "12998"
+    ],
+    "velishoul`s tome pg.43": [
+      "10260"
+    ],
+    "velishoul`s tome pg.44": [
+      "10260"
+    ],
+    "velishoul`s tome pg.67": [
+      "10259"
+    ],
+    "velishoul`s tome pg.68": [
+      "10259"
+    ],
+    "velishoul`s tome pg.75": [
+      "752"
+    ],
+    "velishoul`s tome pg.76": [
+      "752"
+    ],
+    "vial of viscous mana": [
+      "1018182"
+    ],
+    "wasp wing": [
+      "924"
+    ],
+    "water flask": [
+      "1018190",
+      "687"
+    ],
+    "wing of xegony": [
+      "717",
+      "948"
+    ],
+    "words of abatement": [
+      "506",
+      "863"
+    ],
+    "words of abrogation": [
+      "507",
+      "618",
+      "628",
+      "707",
+      "911"
+    ],
+    "words of absorption": [
+      "731",
+      "753"
+    ],
+    "words of acquisition (azia)": [
+      "826"
+    ],
+    "words of acquisition (beza)": [
+      "755"
+    ],
+    "words of agony": [
+      "614",
+      "616",
+      "638",
+      "660",
+      "814"
+    ],
+    "words of allure": [
+      "732"
+    ],
+    "words of anguish": [
+      "607",
+      "611",
+      "647",
+      "706",
+      "834",
+      "879"
+    ],
+    "words of annihilation": [
+      "758",
+      "782",
+      "832"
+    ],
+    "words of anthology": [
+      "738"
+    ],
+    "words of apparition": [
+      "825",
+      "836",
+      "843",
+      "888"
+    ],
+    "words of aptitude": [
+      "887"
+    ],
+    "words of asylum": [
+      "520",
+      "660",
+      "661",
+      "819",
+      "839"
+    ],
+    "words of awareness": [
+      "667",
+      "835"
+    ],
+    "words of banshee": [
+      "607",
+      "647"
+    ],
+    "words of bidding": [
+      "780"
+    ],
+    "words of bondage": [
+      "1008793",
+      "717",
+      "718",
+      "719"
+    ],
+    "words of burnishing": [
+      "522",
+      "659"
+    ],
+    "words of capacity": [
+      "1008721",
+      "10254",
+      "523",
+      "601",
+      "841",
+      "855",
+      "867",
+      "870",
+      "892",
+      "910"
+    ],
+    "words of cazic-thule": [
+      "629",
+      "863",
+      "904",
+      "905"
+    ],
+    "words of cloudburst": [
+      "629"
+    ],
+    "words of coercion": [
+      "721",
+      "722",
+      "723",
+      "724"
+    ],
+    "words of collection (azia)": [
+      "658",
+      "854"
+    ],
+    "words of collection (beza)": [
+      "780"
+    ],
+    "words of collection (caza)": [
+      "632"
+    ],
+    "words of comprehension": [
+      "730",
+      "748",
+      "839",
+      "867"
+    ],
+    "words of constancy": [
+      "652",
+      "707",
+      "743",
+      "748"
+    ],
+    "words of control": [
+      "676",
+      "681",
+      "877"
+    ],
+    "words of convocation": [
+      "763",
+      "764"
+    ],
+    "words of covert": [
+      "652",
+      "662",
+      "664",
+      "682"
+    ],
+    "words of crippling force": [
+      "805"
+    ],
+    "words of dark paths": [
+      "757"
+    ],
+    "words of decision": [
+      "653",
+      "662"
+    ],
+    "words of derivation": [
+      "619"
+    ],
+    "words of descrying": [
+      "803"
+    ],
+    "words of detachment": [
+      "732"
+    ],
+    "words of detention": [
+      "802"
+    ],
+    "words of dimension": [
+      "856",
+      "857",
+      "858",
+      "859"
+    ],
+    "words of discernment": [
+      "837"
+    ],
+    "words of dissemination": [
+      "891"
+    ],
+    "words of dissolution": [
+      "803",
+      "838"
+    ],
+    "words of distress": [
+      "707",
+      "793",
+      "879",
+      "883"
+    ],
+    "words of divergence": [
+      "607",
+      "657"
+    ],
+    "words of domination": [
+      "630",
+      "635",
+      "818",
+      "821",
+      "833",
+      "895",
+      "908"
+    ],
+    "words of dominion": [
+      "10250",
+      "765",
+      "766",
+      "767",
+      "768"
+    ],
+    "words of duration": [
+      "756"
+    ],
+    "words of duress": [
+      "1008790",
+      "795",
+      "796"
+    ],
+    "words of edification": [
+      "668",
+      "834"
+    ],
+    "words of efficacy": [
+      "863"
+    ],
+    "words of endurance": [
+      "633"
+    ],
+    "words of energy": [
+      "698",
+      "781",
+      "819",
+      "877"
+    ],
+    "words of enlightenment": [
+      "738"
+    ],
+    "words of eradication": [
+      "619"
+    ],
+    "words of eventide": [
+      "832",
+      "837"
+    ],
+    "words of exhilaration": [
+      "636",
+      "835"
+    ],
+    "words of expedition": [
+      "611",
+      "860"
+    ],
+    "words of expertise": [
+      "10255",
+      "10256",
+      "600",
+      "602",
+      "623",
+      "627",
+      "674",
+      "762",
+      "785",
+      "786",
+      "879",
+      "Expertise Etched Swatch"
+    ],
+    "words of grappling": [
+      "626"
+    ],
+    "words of haunting": [
+      "757",
+      "853"
+    ],
+    "words of holding": [
+      "627",
+      "668"
+    ],
+    "words of imitation": [
+      "838"
+    ],
+    "words of immunity": [
+      "662",
+      "679",
+      "819",
+      "869"
+    ],
+    "words of incarceration": [
+      "1008792",
+      "648",
+      "649",
+      "650",
+      "651"
+    ],
+    "words of intent": [
+      "1008721",
+      "601",
+      "638",
+      "888"
+    ],
+    "words of invigoration": [
+      "793",
+      "864",
+      "875"
+    ],
+    "words of knowledge": [
+      "600"
+    ],
+    "words of materials": [
+      "735"
+    ],
+    "words of misery": [
+      "574",
+      "614",
+      "652",
+      "668",
+      "706",
+      "758",
+      "888"
+    ],
+    "words of mistbreath": [
+      "629"
+    ],
+    "words of motion": [
+      "633"
+    ],
+    "words of neglect": [
+      "575",
+      "633",
+      "Neglect Scried Swatch"
+    ],
+    "words of obligation": [
+      "576",
+      "632"
+    ],
+    "words of obliteration": [
+      "577",
+      "616",
+      "657"
+    ],
+    "words of odus": [
+      "626"
+    ],
+    "words of pain": [
+      "664",
+      "706",
+      "749"
+    ],
+    "words of parasitism": [
+      "891"
+    ],
+    "words of possession": [
+      "1008789",
+      "732",
+      "853",
+      "891",
+      "896"
+    ],
+    "words of potence": [
+      "799",
+      "841"
+    ],
+    "words of projection": [
+      "905"
+    ],
+    "words of propriety": [
+      "897"
+    ],
+    "words of purification": [
+      "826"
+    ],
+    "words of quivering": [
+      "756"
+    ],
+    "words of radiance": [
+      "904"
+    ],
+    "words of recall": [
+      "769",
+      "782",
+      "793",
+      "875",
+      "911"
+    ],
+    "words of recluse": [
+      "753"
+    ],
+    "words of recourse": [
+      "623",
+      "672",
+      "769",
+      "911"
+    ],
+    "words of refuge": [
+      "731"
+    ],
+    "words of requisition": [
+      "592",
+      "755"
+    ],
+    "words of resolve": [
+      "756"
+    ],
+    "words of restraint": [
+      "613",
+      "631",
+      "712",
+      "813"
+    ],
+    "words of retention": [
+      "781",
+      "911"
+    ],
+    "words of revenant": [
+      "667",
+      "676",
+      "681",
+      "814",
+      "836",
+      "882"
+    ],
+    "words of reviviscence": [
+      "829"
+    ],
+    "words of rupturing": [
+      "853"
+    ],
+    "words of sapience": [
+      "835",
+      "871",
+      "882"
+    ],
+    "words of seizure": [
+      "803"
+    ],
+    "words of sight": [
+      "852"
+    ],
+    "words of spirit": [
+      "735"
+    ],
+    "words of stimulation": [
+      "653",
+      "681",
+      "870"
+    ],
+    "words of tenancy": [
+      "667",
+      "676",
+      "794",
+      "800",
+      "836",
+      "923"
+    ],
+    "words of tenure": [
+      "794",
+      "865"
+    ],
+    "words of the element": [
+      "10250"
+    ],
+    "words of the ethereal": [
+      "528",
+      "775"
+    ],
+    "words of the extinct": [
+      "605"
+    ],
+    "words of the incorporeal": [
+      "826"
+    ],
+    "words of the psyche": [
+      "659"
+    ],
+    "words of the quickening": [
+      "605"
+    ],
+    "words of the sentient (azia)": [
+      "829"
+    ],
+    "words of the sentient (beza)": [
+      "753"
+    ],
+    "words of the spectre": [
+      "905"
+    ],
+    "words of the spoken": [
+      "896"
+    ],
+    "words of the suffering": [
+      "1008791",
+      "757",
+      "780"
+    ],
+    "words of torment": [
+      "706"
+    ],
+    "words of transcendence": [
+      "654",
+      "687"
+    ],
+    "words of tyranny": [
+      "10251",
+      "10252",
+      "10253",
+      "13329",
+      "797"
+    ],
+    "words of virtue": [
+      "10957",
+      "612",
+      "684",
+      "691",
+      "703",
+      "778",
+      "779",
+      "782",
+      "887"
+    ],
+    "words of voiding": [
+      "655",
+      "657"
+    ],
+    "writ of quellious": [
+      "10255",
+      "624",
+      "813",
+      "887",
+      "906"
+    ],
+    "yaeth`s compendium pg. 103": [
+      "711"
+    ],
+    "yaeth`s compendium pg. 105": [
+      "608",
+      "698"
+    ],
+    "yaeth`s compendium pg. 108": [
+      "709",
+      "781",
+      "902"
+    ],
+    "yaeth`s compendium pg. 113": [
+      "669",
+      "685"
+    ],
+    "yaeth`s compendium pg. 115": [
+      "759",
+      "789",
+      "894"
+    ],
+    "yaeth`s compendium pg. 81": [
+      "610",
+      "788",
+      "823",
+      "851"
+    ],
+    "yaeth`s compendium pg. 83": [
+      "680",
+      "801"
+    ],
+    "yaeth`s compendium pg. 92": [
+      "700",
+      "824",
+      "903"
+    ],
+    "yaeth`s compendium pg. 95": [
+      "620",
+      "846"
+    ],
+    "yaeth`s compendium pg. 98": [
+      "606",
+      "714"
+    ],
+    "zeannor`s thesis pg. 16": [
+      "666"
+    ],
+    "zombie skin": [
+      "924"
+    ]
+  }
+}

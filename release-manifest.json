@@ -1,9 +1,9 @@
 {
   "schema": 1,
-  "latestVersion": "0.17.3",
-  "tag": "v0.17.3",
-  "assetName": "eq_spell_research_assistant_v0.17.3.zip",
-  "assetUrl": "https://github.com/jmdeland/eq-spell-research-assistant/releases/download/v0.17.3/eq_spell_research_assistant_v0.17.3.zip",
-  "sha256": "6ba8a8f12f5ab052cb84bdab691592f981b7bbdcb0274e14bdca860b6fed1424",
+  "latestVersion": "0.17.4",
+  "tag": "v0.17.4",
+  "assetName": "eq_spell_research_assistant_v0.17.4.zip",
+  "assetUrl": "https://github.com/jmdeland/eq-spell-research-assistant/releases/download/v0.17.4/eq_spell_research_assistant_v0.17.4.zip",
+  "sha256": "de656bac824ba6b2a8ac74f128f42607ee0a84ee50cc3b10a66dee35b8caaed7",
   "channel": "stable"
 }

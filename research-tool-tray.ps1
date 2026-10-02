@@ -4,47 +4,8 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $root = [IO.Path]::GetFullPath($Root)
-function Repair-DesktopShortcut {
-    try {
-        $desktop=[Environment]::GetFolderPath('Desktop')
-        if(-not $desktop){return}
-        $shortcutPath=Join-Path $desktop 'EverQuest Research & Loot Tool.lnk'
-        $vbs=Join-Path $root 'EverQuest Research & Loot Tool.vbs'
-        $icon=Join-Path $root 'EverQuestResearchLoot.ico'
-        $wscript=Join-Path $env:WINDIR 'System32\wscript.exe'
-        if(-not(Test-Path -LiteralPath $vbs)){return}
-
-        $needsRepair=$true
-        if(Test-Path -LiteralPath $shortcutPath){
-            try {
-                $ws=New-Object -ComObject WScript.Shell
-                $existing=$ws.CreateShortcut($shortcutPath)
-                $expectedArgs='"'+$vbs+'"'
-                if($existing.TargetPath -eq $wscript -and $existing.Arguments -eq $expectedArgs){
-                    $needsRepair=$false
-                }
-            } catch {}
-        }
-
-        if($needsRepair){
-            if(Test-Path -LiteralPath $shortcutPath){Remove-Item -LiteralPath $shortcutPath -Force -ErrorAction SilentlyContinue}
-            $ws=New-Object -ComObject WScript.Shell
-            $sc=$ws.CreateShortcut($shortcutPath)
-            $sc.TargetPath=$wscript
-            $sc.Arguments='"'+$vbs+'"'
-            $sc.WorkingDirectory=$env:TEMP
-            $sc.IconLocation=$icon+',0'
-            $sc.Description='Launch EverQuest Research & Loot Tool'
-            $sc.Save()
-        }
-
-        $userDataRoot = if($env:EQRL_USER_DATA_ROOT){[IO.Path]::GetFullPath($env:EQRL_USER_DATA_ROOT)}else{Join-Path $env:LOCALAPPDATA "EverQuest Research & Loot Tool"}
-        if(-not(Test-Path -LiteralPath $userDataRoot)){New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null}
-        Set-Content -LiteralPath (Join-Path $userDataRoot 'install-root.txt') -Value $root -Encoding UTF8
-    } catch {}
-}
-
-if($env:EQRL_PORTABLE -ne "1"){Repair-DesktopShortcut}
+# Desktop shortcut ownership is handled only by Desktop Setup / updater.
+# The tray intentionally does not repoint shortcuts to whatever folder happened to launch it.
 
 $monitorScript = Join-Path $root 'live-monitor.ps1'
 $iconPath = Join-Path $root 'EverQuestResearchLoot.ico'
@@ -83,9 +44,99 @@ try {
     }
 } catch {}
 
-# Enforce exactly one tray process. A second launch exits before creating another tray.
-try{$ownsMutex=$mutex.WaitOne(0,$false)}catch{$ownsMutex=$false}
-if(-not $ownsMutex){exit 0}
+# Enforce exactly one tray process, but recover from an orphaned tray.
+# A stale tray can survive after its monitor on 8765 has died. Older builds exited
+# silently in that case because the orphan still owned the mutex.
+function Test-CompanionOnline {
+    try {
+        $probe = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8765/api/status' -TimeoutSec 1
+        return ($probe.StatusCode -eq 200)
+    } catch { return $false }
+}
+
+function Test-IsOurTrayProcess([int]$ProcessId) {
+    try {
+        $proc = Get-CimInstance Win32_Process -Filter ("ProcessId = " + $ProcessId) -ErrorAction Stop
+        if(-not $proc){ return $false }
+        $cmd = [string]$proc.CommandLine
+        if([string]::IsNullOrWhiteSpace($cmd)){ return $false }
+        return ($cmd -match '(?i)research-tool-tray\.ps1')
+    } catch { return $false }
+}
+
+function Stop-OrphanedTrayProcesses {
+    $stopped = 0
+
+    if(Test-Path -LiteralPath $trayPidPath){
+        try {
+            $savedPidText = (Get-Content -LiteralPath $trayPidPath -Raw -ErrorAction Stop).Trim()
+            $savedPid = 0
+            if([int]::TryParse($savedPidText,[ref]$savedPid) -and $savedPid -gt 0 -and $savedPid -ne $PID){
+                if(Test-IsOurTrayProcess $savedPid){
+                    Stop-Process -Id $savedPid -Force -ErrorAction SilentlyContinue
+                    $stopped++
+                }
+            }
+        } catch {}
+    }
+
+    if($stopped -eq 0){
+        try {
+            $candidates = Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction SilentlyContinue |
+                Where-Object {
+                    $_.ProcessId -ne $PID -and
+                    ([string]$_.CommandLine) -match '(?i)research-tool-tray\.ps1'
+                }
+            foreach($candidate in @($candidates)){
+                try {
+                    Stop-Process -Id ([int]$candidate.ProcessId) -Force -ErrorAction SilentlyContinue
+                    $stopped++
+                } catch {}
+            }
+        } catch {}
+    }
+
+    Remove-Item -LiteralPath $trayPidPath -Force -ErrorAction SilentlyContinue
+    return $stopped
+}
+
+function Try-AcquireTrayMutex {
+    try {
+        if($mutex.WaitOne(0,$false)){ return $true }
+    } catch [Threading.AbandonedMutexException] {
+        return $true
+    } catch {}
+    return $false
+}
+
+$ownsMutex = Try-AcquireTrayMutex
+
+if(-not $ownsMutex){
+    if(Test-CompanionOnline){
+        Start-Process $toolUrl
+        exit 0
+    }
+
+    $recoveredCount = Stop-OrphanedTrayProcesses
+    if($recoveredCount -gt 0){
+        $deadline=(Get-Date).AddSeconds(4)
+        do {
+            Start-Sleep -Milliseconds 200
+            $ownsMutex = Try-AcquireTrayMutex
+        } while((-not $ownsMutex) -and (Get-Date) -lt $deadline)
+    }
+}
+
+if(-not $ownsMutex){
+    [Windows.Forms.MessageBox]::Show(
+        "EverQuest Research & Loot Tool could not start because an older tray process is still active, but the monitor is offline.`r`n`r`nPlease close any existing Research & Loot Tool tray icon and try again.",
+        'EverQuest Research & Loot Tool',
+        [Windows.Forms.MessageBoxButtons]::OK,
+        [Windows.Forms.MessageBoxIcon]::Warning
+    ) | Out-Null
+    exit 1
+}
+
 Set-Content -LiteralPath $trayPidPath -Value ([string]$PID) -Encoding ASCII
 
 # Reuse the local companion only when it is the same build. If a stale build owns

@@ -5,6 +5,8 @@ const syncedSpellMetadata=new Map();
 
 const LIVE_COMPANION_ORIGIN="http://127.0.0.1:8765";
 const LIVE_EVENT_ORIGIN="http://127.0.0.1:8767";
+const LIVE_WORKER_START_GRACE_MS=20000;
+const liveWorkerConnectStartedAt=Date.now();
 function liveEventUrl(path){return `${LIVE_EVENT_ORIGIN}${path}`;}
 const PERSISTENCE_ORIGIN="http://127.0.0.1:8766";
 function persistenceUrl(path){return `${PERSISTENCE_ORIGIN}${path}`;}
@@ -474,6 +476,8 @@ function liveSettings(){
   soundHigh:$("#soundHighValue")?.checked??true,
   soundAny:$("#soundAnyResearch")?.checked??false,
   soundCraftable:$("#soundCraftable")?.checked??true,
+  enabled:liveEnabled,
+  selectedClass:$("#classFilter")?.value||"ALL",
   threshold:Math.max(1,Number($("#highValueThreshold")?.value||5)),
   volume:Math.max(0,Math.min(1,Number($("#liveVolume")?.value||65)/100)),
   ownershipMode:$("#lootOwnershipMode")?.value||"COUNT"
@@ -491,17 +495,28 @@ function loadLiveSettings(){
   if($("#soundHighValue"))$("#soundHighValue").checked=s.soundHigh!==false;
   if($("#soundAnyResearch"))$("#soundAnyResearch").checked=!!s.soundAny;
   if($("#soundCraftable"))$("#soundCraftable").checked=s.soundCraftable!==false;
+  if(typeof s.enabled==="boolean")liveEnabled=s.enabled;
   if($("#highValueThreshold")&&s.threshold)$("#highValueThreshold").value=s.threshold;
   if($("#liveVolume")&&s.volume!=null)$("#liveVolume").value=Math.round(s.volume*100);
   if($("#lootOwnershipMode")&&s.ownershipMode)$("#lootOwnershipMode").value=s.ownershipMode;
  }catch{}
 }
-function ensureAudio(){
- if(!liveAudioCtx){const AC=window.AudioContext||window.webkitAudioContext;if(AC)liveAudioCtx=new AC()}
- if(liveAudioCtx?.state==="suspended")liveAudioCtx.resume();
+async function ensureAudio(){
+ try{
+  if(!liveAudioCtx){const AC=window.AudioContext||window.webkitAudioContext;if(AC)liveAudioCtx=new AC()}
+  if(!liveAudioCtx)return false;
+  if(liveAudioCtx.state!=="running")await liveAudioCtx.resume();
+  return liveAudioCtx.state==="running";
+ }catch{return false}
 }
-function beep(kind){
- const s=liveSettings();if(!liveAudioCtx||s.volume<=0)return;
+async function beep(kind){
+ const s=liveSettings();if(s.volume<=0||!liveEnabled)return;
+ try{
+  const r=await fetch(liveEventUrl(`/api/native-sound-test?kind=${encodeURIComponent(kind)}`),{cache:"no-store"});
+  if(r.ok){const j=await r.json();if(j?.played)return}
+ }catch{}
+ // Browser fallback only if the native Windows alert path is unavailable.
+ if(!(await ensureAudio()))return;
  const plans={
   research:[[660,.10]],
   high:[[880,.12],[1175,.16]],
@@ -822,13 +837,13 @@ function processLootEvent(evt,{isReplay=false,deferRender=false,provisionalAccep
  let feedEntry=null;
  if(cls.uses.length){
   feedEntry={eventId:evt.id??null,item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",value:cls.value,uses:cls.uses.length,ambiguous:cls.ambiguous,ids:cls.ids,corpseRecovery,playerValueOverride:cls.playerValueOverride||""};
-  if(liveEnabled&&!corpseRecovery&&cls.value!=="NOT VALUABLE"){if(cls.value==="HIGH VALUE"&&s.soundHigh)beep("high");else if(cls.uses.length&&s.soundAny)beep("research");}
+  if(s.classOnly&&liveEnabled&&!corpseRecovery&&cls.value!=="NOT VALUABLE"){if(cls.value==="HIGH VALUE"&&s.soundHigh)beep("high");else if(cls.uses.length&&s.soundAny)beep("research");}
  }else if(!isReplay){
   const researchLooking=/^words? of |^rune of |grimoire|compendium|memoir|writ|tome|signet|emblem|bolts|card of /i.test(evt.item);
   const defaultValue=researchLooking?"UNKNOWN":"OTHER";
   const displayValue=cls.playerValueOverride?cls.value:defaultValue;
   feedEntry={eventId:evt.id??null,item:evt.item,looter:evt.looter||"Unknown",timestamp:evt.timestamp||"",zone:evt.zone||currentZoneContext.zone||"",value:displayValue,uses:0,ambiguous:false,ids:[],corpseRecovery,playerValueOverride:cls.playerValueOverride||""};
-  if(liveEnabled&&!corpseRecovery&&cls.playerValueOverride==="HIGH VALUE"&&s.soundHigh)beep("high");
+  if(s.classOnly&&liveEnabled&&!corpseRecovery&&cls.playerValueOverride==="HIGH VALUE"&&s.soundHigh)beep("high");
  }
 
  if(feedEntry){
@@ -1107,14 +1122,14 @@ function setupLootHistoryUI(){
  else switchWorkspace("home",{scroll:false});
 }
 
-function liveOwnershipSummaryText(mode){
+function liveOwnershipSummaryHtml(mode){
  return mode==="COUNT"?
-  "Group/personal mode: tracked loot counts provisionally until Magelo confirms it.":
-  "Raid/observation mode: loot is tracked for awareness only and does not affect inventory or recipe readiness.";
+  "<strong>Group/personal mode:</strong> tracked loot counts provisionally until Magelo confirms it.":
+  "<strong>Raid/observation mode:</strong> loot is tracked for awareness only and does not affect inventory or recipe readiness.";
 }
 function refreshLiveHeaderStatus(){
  const mode=$("#lootOwnershipMode")?.value||"COUNT";
- const el=$("#liveOwnershipSummary");if(el)el.textContent=liveOwnershipSummaryText(mode);
+ const el=$("#liveOwnershipSummary");if(el)el.innerHTML=liveOwnershipSummaryHtml(mode);
 }
 function parseEqLogTimestamp(value){
  if(!value)return null;
@@ -1227,15 +1242,21 @@ async function pollLiveMonitor(){
    return;
   }
   liveMonitorOnline=false;
-  if($("#liveStatus")){$("#liveStatus").textContent="OFFLINE";$("#liveStatus").className="live-status offline"}
-  if($("#liveLogName"))$("#liveLogName").textContent="Not connected";
-  if($("#liveMonitorMessage"))$("#liveMonitorMessage").textContent=`Dedicated Live Loot worker not detected at ${LIVE_EVENT_ORIGIN}: ${e.message}`;
+  const stillStarting=(Date.now()-liveWorkerConnectStartedAt)<LIVE_WORKER_START_GRACE_MS;
+  if($("#liveStatus")){
+   $("#liveStatus").textContent=stillStarting?"STARTING":"OFFLINE";
+   $("#liveStatus").className=stillStarting?"live-status":"live-status offline";
+  }
+  if($("#liveLogName"))$("#liveLogName").textContent=stillStarting?"Starting Live Loot…":"Not connected";
+  if($("#liveMonitorMessage"))$("#liveMonitorMessage").textContent=stillStarting?
+   "Live Loot worker is starting. This normally takes only a few seconds.":
+   `Dedicated Live Loot worker not detected at ${LIVE_EVENT_ORIGIN}: ${e.message}`;
  }finally{
   livePollInFlight=false;
  }
 }
 async function replayRecentLoot(){
- if(!liveMonitorOnline){$("#liveMonitorMessage").textContent="Start START-LIVE-MONITOR.bat first.";return}
+ if(!liveMonitorOnline){$("#liveMonitorMessage").textContent="Start the app with START HERE.bat first.";return}
  try{
   const r=await fetch(apiUrl("/api/replay-test"),{cache:"no-store"});
   const j=await r.json();
@@ -1365,7 +1386,7 @@ async function watchBastionSync(){
 }
 async function syncBastionCorpus(){
  if(!liveMonitorOnline){
-  $("#corpusSyncStatus").textContent="Start the app with START-LIVE-MONITOR.bat before syncing.";
+  $("#corpusSyncStatus").textContent="Start the app with START HERE.bat before syncing.";
   $("#corpusSyncStatus").className="sync-bad";
   return;
  }
@@ -1451,7 +1472,7 @@ async function watchSpellMetadataSync(){
 }
 async function syncSpellMetadata(){
  if(!liveMonitorOnline){
-  $("#spellMetadataStatus").textContent="Start the demo with START-LIVE-MONITOR.bat before syncing.";
+  $("#spellMetadataStatus").textContent="Start the app with START HERE.bat before syncing.";
   return;
  }
  const btn=$("#syncSpellMetadata");btn.disabled=true;btn.textContent="Starting metadata sync…";
@@ -1471,11 +1492,11 @@ async function syncSpellMetadata(){
  }
 }
 async function changeLogFile(){
- if(!liveMonitorOnline){$("#liveMonitorMessage").textContent="Start START-LIVE-MONITOR.bat first.";return}
+ if(!liveMonitorOnline){$("#liveMonitorMessage").textContent="Start the app with START HERE.bat first.";return}
  try{
   const r=await fetch(apiUrl("/api/change-log"),{cache:"no-store"});
   const j=await r.json();
-  if(j.ok)$("#liveMonitorMessage").textContent=`New log saved: ${j.logPath}. Restart START-LIVE-MONITOR.bat to watch it.`;
+  if(j.ok)$("#liveMonitorMessage").textContent=`New log saved: ${j.logPath}. Restart the app from START HERE.bat to watch it.`;
  }catch(e){
   $("#liveMonitorMessage").textContent=`Could not change log file: ${e.message}`;
  }
@@ -1490,9 +1511,12 @@ function setupLiveUI(){
  const unlockAudio=()=>{if(liveEnabled)ensureAudio();document.removeEventListener("pointerdown",unlockAudio);document.removeEventListener("keydown",unlockAudio)};
  document.addEventListener("pointerdown",unlockAudio,{once:true});
  document.addEventListener("keydown",unlockAudio,{once:true});
- ["liveIncludeOthers","liveClassOnly","soundHighValue","soundAnyResearch","soundCraftable","highValueThreshold","liveVolume","lootOwnershipMode"].forEach(id=>$("#"+id)?.addEventListener("input",saveLiveSettings));
+ window.addEventListener("focus",()=>{if(liveEnabled)ensureAudio()});
+ document.addEventListener("visibilitychange",()=>{if(liveEnabled&&document.visibilityState==="visible")ensureAudio()});
+ ["liveIncludeOthers","liveClassOnly","soundHighValue","soundAnyResearch","soundCraftable","highValueThreshold","liveVolume","lootOwnershipMode","classFilter"].forEach(id=>$("#"+id)?.addEventListener("input",()=>{saveLiveSettings();persistBrowserStateToCompanion()}));
  $("#enableLiveAlerts")?.addEventListener("click",()=>{
   ensureAudio();liveEnabled=!liveEnabled;$("#enableLiveAlerts").textContent=liveEnabled?"Mute Sounds / Attention Alerts":"Enable Sounds / Attention Alerts";
+  saveLiveSettings();persistBrowserStateToCompanion();
   $("#liveMonitorMessage").textContent=liveEnabled?"Sounds/attention alerts enabled. Loot tracking is always active while connected.":"Sounds muted. Loot tracking remains active.";
  });
  $("#testLiveReplay")?.addEventListener("click",()=>{ensureAudio();replayRecentLoot()});
@@ -1589,7 +1613,7 @@ function saveMageloSettings(){
  }catch{}
 }
 async function loadMageloSlot(slot,value=null){
- if(!liveMonitorOnline){const e=mageloSlotEls(slot);if(e.status)e.status.textContent="Start START-LIVE-MONITOR.bat first.";return}
+ if(!liveMonitorOnline){const e=mageloSlotEls(slot);if(e.status)e.status.textContent="Start the app with START HERE.bat first.";return}
  const profile=mageloProfiles[slot],els=mageloSlotEls(slot);
  const input=normalizeMageloInput(value!==null&&value!==undefined?value:els.input?.value);if(!input){if(els.status)els.status.textContent="Enter a character name or Bastion Magelo URL.";return}
  if(els.button){els.button.disabled=true;els.button.textContent="Loading…"}
@@ -1769,7 +1793,7 @@ async function checkForUpdates(){
  if(dl)dl.disabled=true;
  updateBadge("CHECKING","offline");setUpdateStatus("Contacting GitHub stable releases…");
  try{
-  if(!liveMonitorOnline)throw Error("Start START-LIVE-MONITOR.bat first. Update checks run through the local companion.");
+  if(!liveMonitorOnline)throw Error("Start the app with START HERE.bat first. Update checks run through the local companion.");
   const r=await fetch(apiUrl("/api/update-check"),{cache:"no-store"}),j=await r.json();
   if(!r.ok||!j.ok)throw Error(j.error||`HTTP ${r.status}`);
   latestUpdateInfo=j;const cmp=compareStableVersions(j.latestVersion,j.installedStableVersion);
